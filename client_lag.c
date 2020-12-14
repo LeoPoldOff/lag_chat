@@ -10,10 +10,12 @@
 #include <fcntl.h>
 #include <time.h>
 #include <arpa/inet.h>
+#include <pthread.h>
+#include <poll.h>
 
 #define HOST "3.9.16.135"
 #define PORT 81
-#define MAX_BUF_SIZE 256
+#define MAX_BUF_SIZE 4096
 
 //*******************SERVICE FUNCTIONS******************
 void err(char *msg, const char *arg, bool critical) {
@@ -184,24 +186,24 @@ int handle_ECHO(int sock_fd) {
 	return send_buf(sock_fd, res);
 }
 
-int handle_LOGIN(int sock_fd) {
+int handle_LOGIN(int sock_fd, char* login, char* password) {
 	char* cmd = "LOGIN|username=";
 	char msg[36];
 	char* cmd1 = "|password=";
 	char msg1[36];
-	scanf("%s", &msg);
+	//scanf("%s", &msg);
 	int *p;
-	p = &msg;
+	p = login;
 	Piza_tower(p);
-	scanf("%s", &msg1);
+	//scanf("%s", &msg1);
 	int *p1;
-	p1 = &msg1;
+	p1 = password;
 	Piza_tower(p1);
-	char* res = malloc(strlen(cmd) + strlen(msg) + strlen(cmd1) + strlen(msg1) + 1);
+	char* res = malloc(strlen(cmd) + strlen(p) + strlen(cmd1) + strlen(p1) + 1);
 	strcpy(res, cmd);
-	strcat(res, msg);
+	strcat(res, p);
 	strcat(res, cmd1);
-	strcat(res, msg1);
+	strcat(res, p1);
 	return send_buf(sock_fd, res);
 }
 
@@ -295,7 +297,7 @@ void main_loop() {
 				goto _exit;
 			}
 			case 6: {
-				handle_LOGIN(sock_fd);
+				handle_LOGIN(sock_fd, "agaffosh", "123");
 				break;
 			}
 			case 7: {
@@ -319,9 +321,118 @@ void main_loop() {
 _exit:
     close(sock_fd);
 }
-//*******************COMMAND HANDLING******************
+//*******************COMMAND HANDLING*********************
 
-int main(int argc, char **argv) {
-	main_loop();
-    return 0;
+//************************DAEMON**************************
+
+
+void auth(int sock_fd, char* login, char* password)			// авторизация по логину и паролю
+{
+	if(valid_login_password(login) && valid_login_password(password))
+	{
+		sleep(1);
+		char result[MAX_BUF_SIZE];
+		handle_LOGIN(sock_fd, login, password);
+		memset(result, 0, sizeof(result));
+		errwrap(recv(sock_fd, result, MAX_BUF_SIZE, 0));
+		printf(result);
+	}
+	else
+	{
+		printf("Invalid login/password");
+	}
+}
+
+void *daemon_checker(void *vargp) 				// собсна демон
+{
+	// if(IS_RUN == 0)
+	// {
+	// 	return NULL;
+	// }
+	int sock_fd = sock_init();					// наш сокет на приём данных
+	int timeout;
+	char cur_users[MAX_BUF_SIZE];
+	char recv_buf[MAX_BUF_SIZE];
+
+	struct pollfd fds[2];						// хероборина для обновления логина
+
+    while(1)
+    {
+		auth(sock_fd, "agaffosh", "123");		// авторизируемся
+		sleep(1);
+
+		fds[0].fd = sock_fd;
+		fds[0].events = POLLIN;
+
+		timeout = 3000;
+		int ret = poll( &fds, 2, timeout );
+
+		if (ret == -1)
+		{
+			printf("poll error");
+			break;
+		}
+		else if (ret == 0)
+		{
+								// пингуем список юзеров
+			auth(sock_fd, "agaffosh", "123");
+			sleep(1);
+			handle_USERS(sock_fd);
+	  		memset(cur_users, 0, sizeof(cur_users));
+	  		errwrap(recv(sock_fd, cur_users, MAX_BUF_SIZE, 0));
+	  		printf(cur_users);
+	  		printf("\n\n");
+	  		sleep(1);
+		}
+		else
+		{
+								// пингуем список юзеров
+			handle_USERS(sock_fd);
+	  		memset(cur_users, 0, sizeof(cur_users));
+	  		errwrap(recv(sock_fd, cur_users, MAX_BUF_SIZE, 0));
+	  		printf(cur_users);
+	  		printf("\n\n");
+	  		sleep(1);
+
+								// принимаем сообщения
+			sleep(1);
+			memset(recv_buf, 0, sizeof(recv_buf));
+			errwrap(recv(sock_fd, recv_buf, 2048, 0));
+			printf(recv_buf);
+			printf("\n\n");
+			sleep(1);
+		}
+    }
+	close(sock_fd);
+    return NULL;
+}
+
+void kek()						// самая полезная функция эвер
+{
+    while(1)
+    {
+        sleep(1);
+        printf("kek\n");
+    }
+    
+}
+
+void daemon_loop()				// петля с потоком для демона
+{
+	pthread_t daemon_thread;
+
+    pthread_create(&daemon_thread, NULL, daemon_checker, NULL);
+
+    pthread_join(&daemon_thread, NULL);
+}
+
+
+int main(int argc, char **argv) 
+{
+	// main_loop();
+
+	daemon_loop();
+
+    exit(0);
+
 }

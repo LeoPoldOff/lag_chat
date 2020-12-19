@@ -8,6 +8,8 @@
 #include <semaphore.h>
 #include "parser.c"
 
+#define CHAT_BUFFER_L 150 * 16
+#define USERS_POINTERS_L 45 * 16
 
 int getche() 
 {
@@ -495,6 +497,15 @@ void AuthHandler(char log[], char pass[])
 // ============================================================================================================================================================
 // ============================================================================================================================================================
 
+enum MainBackground
+{
+    BackgoundInput = 0,
+    BackgroundChat = 1,
+    BackgroundUsers = 2
+};
+
+
+int SCREEN = BackgoundInput;
 char INPUT[256] = {'\0'};
 char CURSOR_X = 0;
 char CURSOR_Y = 0;
@@ -503,11 +514,9 @@ pthread_mutex_t CURSOR_MUTEX;
 
 char CHAT[65536] = {'\0'};
 int CHAT_POINTER = 0;
-int CHAT_BUFFER_L = 150 * 16;
 
 char USERS[4096] = {'\0'};
-int USERS_POINTERS = 0;
-int USERS_POINTERS_L = 45 * 16;
+int USERS_POINTER = 0;
 
 
 void GetMainScreen()
@@ -515,7 +524,29 @@ void GetMainScreen()
     char main_screen[4096];
     FILE *fp;
     char *file_name[32];
-    *file_name = "static/main_input.txt";
+    switch (SCREEN)
+    {
+        case BackgoundInput:
+        {
+            *file_name = "static/main_input.txt";
+            break;
+        }
+        case BackgroundChat:
+        {
+            *file_name = "static/main_chat.txt";
+            break;
+        }
+        case BackgroundUsers:
+        {
+            *file_name = "static/main_users.txt";
+        }
+        default:
+        {
+            system("clear");
+            printf("Неизвестный бэкграунд\n");
+            break;
+        }
+    }
     fp = fopen(*file_name, "r");
     SetCursorPos(0, 0);
     while (fgets(main_screen, 2812, fp) != NULL)
@@ -524,18 +555,73 @@ void GetMainScreen()
     SetCursorPos(26, 29);
 }
 
-/*
-
-void PressEnter()
+void CopyToBuffer(char source[], char target[], int start)
 {
-    // TODO
+    int last = start + strlen(target);
+    int size = strlen(source);
+    for (int i = start; i < last; i++)
+    {
+        if (size <= i)
+        {
+            system("clear");
+            printf("Вылезли за границы массива при копировании в буфер\n");
+        }
+        target[i - start] = source[i];
+    }
+}
+
+void PrintContentChat()
+{
+    char content[16][256];
+    char string_content[CHAT_BUFFER_L] = {'\0'};
+    CopyToBuffer(CHAT, string_content, CHAT_POINTER);
+    int count = long_str_parser(content, string_content, 150);
+    print_massive_in_x_y(string_content, count, 25, 9);
+}
+
+void PrintContentUsers()
+{
+    char content[16][256];
+    char string_content[USERS_POINTERS_L] = {'\0'};
+    CopyToBuffer(USERS, string_content, USERS_POINTER);
+    int count = long_str_parser(content, string_content, 45);
+    print_massive_in_x_y(string_content, count, 85, 10);
+}
+
+void PrintContentInput()
+{
+    SetCursorPos(26, 29);
+    printf(INPUT);
 }
 
 void Update()
 {
-    // TODO
+    pthread_mutex_lock(&CURSOR_MUTEX);
+    GetMainScreen();
+    PrintContentChat();
+    PrintContentUsers();
+    PrintContentInput();
+    SetCursorPos(CURSOR_X, CURSOR_Y);
+    pthread_mutex_unlock(&CURSOR_MUTEX);
 }
 
+
+int PressEnter(char* input, int sock_fd){
+	char args[50][100];
+	int res = request_parser(input, args);
+	if (res == -1){
+		memset(input, '\0', 256);
+		return -1;
+	}
+	else if (res == 0 || res == 1){
+		extern sendbuf(sock_fd, input);
+		memset(input, '\0', 256);
+		return 1;
+	}
+
+}
+
+/*
 void AnalizeChar()
 {
     // TODO
@@ -551,7 +637,7 @@ void BackspaceHandler()
     // TODO
 }
 
-*/
+
 
 void MainHandler(char login[], char password[])
 {
@@ -561,7 +647,6 @@ void MainHandler(char login[], char password[])
     int current_position = 0;
     int last_position = 0;
     GetMainScreen();
-    /*
     while (flag)
     {
         input_char = getch();
@@ -638,19 +723,38 @@ void MainHandler(char login[], char password[])
         }
         // Update screen
     }
-    */
 }
+
+*/
 
 // BackspaceHandler(char input[], int left_shift, int shift_y, int* max_symbol_count, int* current_symbol, int symbols_counter[])
 // AnalizeInputChar(int code, char array[], int is_pass, int* current_symbol, int* max_symbol_count, int symbols_counter[])
 int main()
 {
     setlocale( LC_ALL, "");
+    pthread_mutex_init(&CURSOR_MUTEX, NULL);
 
+    /*
     char login[64] = {'\n'};
     char password[64] = {'\n'};
 
     AuthHandler(login, password);
     system("clear");
     MainHandler(login, password);
+    */
+
+    char k[] = "Гоша вообще хорош. Демон ебошит!";
+    char b[] = "Гоша";
+    for (int i = 0; i <strlen(k); i++)
+    {
+       CHAT[i] = k[i];
+    }
+
+    for (int i = 0; i <strlen(b); i++)
+    {
+       USERS[i] = b[i];
+    }
+
+    Update();
+    pthread_mutex_destroy(&CURSOR_MUTEX);
 }

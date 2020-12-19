@@ -15,7 +15,7 @@
 
 // функкция принимает на вход указатель на сообщение, макс. длину разбиения и массив для складирования результата
 // возвращает количество кусков, на которое разбила
-int long_str_parser(char massive1[][100], char* msg, int len) { 
+int long_str_parser(char massive1[][256], char* msg, int len) { 
 	len = len - 1;
 	char* res_massive = malloc(50); // вспомогательный массив
 	int msg_len = strlen(msg);
@@ -56,7 +56,7 @@ int long_str_parser(char massive1[][100], char* msg, int len) {
 
 // функия принимает массив для результата, указатель на сообщение и символ разделитель
 // возвращает количество частей, на которые разделил
-int str_separator(char massive1[][100], char* msg, char sep){
+int str_separator(char massive1[][256], char* msg, char sep){
 	char* res_massive = malloc(50);
 	int counter = -1;
 	int slot_counter = 0;
@@ -103,8 +103,7 @@ void SetCursorPos(int XPos, int YPos)
 
 // функция принимает массив с данными, количество элементов и координаты в терминале
 // пишет в столбик данные из массива начиная с указанных координат
-void print_massive_in_x_y(char massive[][100], int num_of_pieces, int x, int y) {
-	system("clear");
+void print_massive_in_x_y(char massive[][256], int num_of_pieces, int x, int y) {
 	for (int a = 0; a < num_of_pieces; a++){
 			SetCursorPos(x, y);
 			printf(massive[a]);
@@ -282,25 +281,9 @@ int request_parser(char* msg, char args[][50]){
 // функция принимает input строку и инт сокета
 // проверяет input на валидность(возвращает -1 или 1) и очищает input
 // если валиден, то отправляет запрос серверу и вызывает функцию update 
-int Press_Enter(char* input, int sock_fd){
-	char args[50][100];
-	int res = request_parser(input, args);
-	if (res == -1){
-		printf("%s\n", "санёк обосран");
-		memset(input, '\0', 256);
-		return -1;
-	}
-	else if (res == 0 || res == 1){
-		extern sendbuf(sock_fd, input);
-		// update();
-		printf("%s\n", "санёк очищен");
-		memset(input, '\0', 256);
-		return 1;
-	}
-
-}
 
 //=======================================================//
+/*
 int main(int argc, char **argv) {
 	int sock_fd = sock_init();
 	// char msg[40] = "SEND|username=dasd|msg=dasds";
@@ -321,3 +304,4 @@ int main(int argc, char **argv) {
 	// printf("%s\n", args[1]);
     return 0;
 }
+*/

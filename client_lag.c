@@ -426,13 +426,3 @@ void daemon_loop()				// петля с потоком для демона
     pthread_join(&daemon_thread, NULL);
 }
 
-
-int main(int argc, char **argv) 
-{
-	// main_loop();
-
-	daemon_loop();
-
-    exit(0);
-
-}

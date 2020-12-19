@@ -11,6 +11,7 @@
 #include <time.h>
 #include <arpa/inet.h>
 #include <regex.h>
+#include "client_lag.c"
 
 // функкция принимает на вход указатель на сообщение, макс. длину разбиения и массив для складирования результата
 // возвращает количество кусков, на которое разбила
@@ -278,19 +279,45 @@ int request_parser(char* msg, char args[][50]){
 	return 1;
 }
 
+// функция принимает input строку и инт сокета
+// проверяет input на валидность(возвращает -1 или 1) и очищает input
+// если валиден, то отправляет запрос серверу и вызывает функцию update 
+int Press_Enter(char* input, int sock_fd){
+	char args[50][100];
+	int res = request_parser(input, args);
+	if (res == -1){
+		printf("%s\n", "санёк обосран");
+		memset(input, '\0', 256);
+		return -1;
+	}
+	else if (res == 0 || res == 1){
+		extern sendbuf(sock_fd, input);
+		// update();
+		printf("%s\n", "санёк очищен");
+		memset(input, '\0', 256);
+		return 1;
+	}
+
+}
+
 //=======================================================//
 int main(int argc, char **argv) {
-	char msg[40] = "SEND|username=dasd|msg=dasds";
-	char args[50][50];
+	int sock_fd = sock_init();
+	// char msg[40] = "SEND|username=dasd|msg=dasds";
+	char INPUT[256] = "SEND|username=dasd|msg=dasds";
+	char args[50][100];
 	char massive[50][100];
 	int *p;
-	p = &msg;
+	// p = &msg;
+	p = &INPUT;
 	// int num_of_pieces = long_str_parser(massive, p, 6);
 	// int num_of_pieces = str_separator(massive, p, '|');
-	// print_massive_in_x_y(massive, num_of_pieces, 5, 5);
-	int res = request_parser(p, args);
+	// print_massive_in_x_y(massive, num_of_pieces, 5, 5); '\0'
+	// int res = request_parser(p, args);
+	int res = Press_Enter(p, sock_fd);
 	printf("%d\n", res);
-	printf("%s\n", args[0]);
-	printf("%s\n", args[1]);
+	printf("%s\n", INPUT);
+	// printf("%s\n", args[0]);
+	// printf("%s\n", args[1]);
     return 0;
 }

@@ -17,6 +17,38 @@
 #define PORT 81
 #define MAX_BUF_SIZE 4096
 
+#define CHAT_BUFFER_L 150 * 16
+#define USERS_POINTERS_L 45 * 16
+
+
+//int SCREEN = BackgoundInput;
+
+// char INPUT[256] = {'\0'};
+// int INPUT_SIZER[256] = {0};
+// int INPUT_SIZER_POINTER = 0;
+// int INPUT_SIZER_LAST_SYMBOL_POINTER = 0;
+int ISRUN = 1;								// ISRUN
+
+char CURSOR_X = 0;
+char CURSOR_Y = 0;
+
+char USER_LIST[4096][255];
+
+char MSG_LIST[4096][255];
+int MSG_LIST_POINTER = 0;
+
+pthread_mutex_t CURSOR_MUTEX;
+
+char CHAT[65536] = {'\0'};
+int CHAT_POINTER = 0;
+
+char USERS[4096] = {'\0'};
+
+int SOCK_FD = 0;
+
+int SHIFT_X = 39;
+int SHIFT_Y = 28;
+
 //*******************SERVICE FUNCTIONS******************
 void err(char *msg, const char *arg, bool critical) {
     if(msg == NULL || strlen(msg) == 0) {
@@ -325,8 +357,107 @@ _exit:
 
 //************************DAEMON**************************
 
+int daemon_parser(char catched_commands[][255], char msg[])  		// парсер прилетающих с демона данных
+{
+	char* aux_arr = malloc(255);
+	int counter = -1;
+	int slot_counter = 0;
+	int comms_count = 0;
+	char* zero_str = malloc(255);
+	memset(zero_str, ' ', 255);
+	for (int e = 0; e < strlen(msg); e++){
+		counter = counter + 1;
+		if (msg[e] != '\n'){
+			aux_arr[counter] = msg[e];
+			continue;
+		}
 
-void auth(int sock_fd, char* login, char* password)			// авторизация по логину и паролю
+		if (msg[e] == '\n')
+		{
+			if (strcmp(aux_arr, zero_str) == 0){
+				counter = -1;
+				continue;
+			}
+			strcpy(catched_commands[slot_counter], aux_arr);
+			memset(aux_arr, '\0', 255);
+			slot_counter = slot_counter + 1;
+			counter = -1;
+			comms_count = comms_count + 1;
+		}
+	}
+	if (strcmp(aux_arr, zero_str) != 0){
+		counter = -1;
+		for (int x = 0; x < 255; x++){
+			if (aux_arr[x] != '\n'){
+				counter = counter + 1;
+				catched_commands[slot_counter][counter] = aux_arr[x];
+			}
+		}
+		comms_count = comms_count + 1;
+	}
+
+	pthread_mutex_lock(&CURSOR_MUTEX);
+	for (int i = 0; i < 4096; i++)
+		for (int j = 0; j < 255; j++)
+		{
+			USER_LIST[i][j] = '\0';
+		}
+	pthread_mutex_unlock(&CURSOR_MUTEX);
+
+	slot_counter = 0;
+	counter = 0;
+
+	pthread_mutex_lock(&CURSOR_MUTEX);
+	for (int i = 0; i < comms_count; i++)
+	{
+		if (strstr(catched_commands[i], "MSGFROM [") != NULL)
+		{
+			counter = -1;
+			for (int a = 0; a < strlen(catched_commands[i]); a++)
+			{
+				counter = counter + 1;
+				MSG_LIST[MSG_LIST_POINTER][counter] = catched_commands[i][a];
+			}
+			// printf("\n----\n");
+			// printf(MSG_LIST[MSG_LIST_POINTER]);
+			// printf("\n----\n");
+
+			MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
+
+		}
+		else if (strcmp(catched_commands[i], "+") == 0)
+		{
+			continue;
+		//	printf("logged\n");
+		}
+		else if (strstr(catched_commands[i], "Too fast") != NULL)
+		{
+			continue;
+		//	printf("Too fast\n");
+		}
+		else 
+		{
+			counter = -1;
+			//printf("\n-----\n");
+			//printf(catched_commands[i]);
+			//printf("\n-----\n");
+			for (int a = 0; a < strlen(catched_commands[i]); a++)
+			{
+				counter = counter + 1;
+				USER_LIST[i][counter] = catched_commands[i][a];
+			}
+			// printf("\n");
+			// printf(USER_LIST[i]);
+			// printf("\n");
+		}
+	}
+	pthread_mutex_unlock(&CURSOR_MUTEX);
+	update();
+
+	return comms_count;
+}
+
+void auth(int sock_fd, char login[], char password[])			// авторизация по логину и паролю
 {
 	if(valid_login_password(login) && valid_login_password(password))
 	{
@@ -335,37 +466,47 @@ void auth(int sock_fd, char* login, char* password)			// авторизация 
 		handle_LOGIN(sock_fd, login, password);
 		memset(result, 0, sizeof(result));
 		errwrap(recv(sock_fd, result, MAX_BUF_SIZE, 0));
-		printf(result);
+		// printf(result);
 	}
 	else
 	{
-		printf("Invalid login/password");
+		return;													// тут подпилить неверный логин/пароль
+		// printf("Invalid login/password");
 	}
 }
 
-void *daemon_checker(void *vargp) 				// собсна демон
+void *daemon_checker(void * arg) 				// собсна демон
 {
-	// if(IS_RUN == 0)
-	// {
-	// 	return NULL;
-	// }
-	int sock_fd = sock_init();					// наш сокет на приём данных
-	int timeout;
+	
+	pthread_mutex_lock(&CURSOR_MUTEX);
+	SOCK_FD = sock_init();	
+	pthread_mutex_unlock(&CURSOR_MUTEX);					// наш сокет на приём данных (вырезать впоследствии)
+
 	char cur_users[MAX_BUF_SIZE];
 	char recv_buf[MAX_BUF_SIZE];
 
 	struct pollfd fds[2];						// хероборина для обновления логина
 
-    while(1)
-    {
-		auth(sock_fd, "agaffosh", "123");		// авторизируемся
-		sleep(1);
+	int users_timing_counter = 0;
 
-		fds[0].fd = sock_fd;
+    while(ISRUN)
+    {
+		pthread_mutex_lock(&CURSOR_MUTEX);
+
+		auth(SOCK_FD, "agaffosh", "123");		// авторизируемся (вырезать впоследствии)
+
+		pthread_mutex_unlock(&CURSOR_MUTEX);
+		sleep(1);
+		pthread_mutex_lock(&CURSOR_MUTEX);
+
+		fds[0].fd = SOCK_FD;
 		fds[0].events = POLLIN;
 
-		timeout = 3000;
-		int ret = poll( &fds, 2, timeout );
+		pthread_mutex_unlock(&CURSOR_MUTEX);
+
+		//timeout = 3000;
+		int ret = poll( &fds, 2, 1000 );
+
 
 		if (ret == -1)
 		{
@@ -374,55 +515,116 @@ void *daemon_checker(void *vargp) 				// собсна демон
 		}
 		else if (ret == 0)
 		{
-								// пингуем список юзеров
-			auth(sock_fd, "agaffosh", "123");
-			sleep(1);
-			handle_USERS(sock_fd);
-	  		memset(cur_users, 0, sizeof(cur_users));
-	  		errwrap(recv(sock_fd, cur_users, MAX_BUF_SIZE, 0));
-	  		printf(cur_users);
-	  		printf("\n\n");
-	  		sleep(1);
+			if (users_timing_counter == 0)
+			{											// пингуем список юзеров
+													
+				pthread_mutex_lock(&CURSOR_MUTEX);
+
+				handle_USERS(SOCK_FD);
+	  			memset(cur_users, 0, sizeof(cur_users));
+	  			errwrap(recv(SOCK_FD, cur_users, MAX_BUF_SIZE, 0));
+				
+				pthread_mutex_unlock(&CURSOR_MUTEX);
+
+				char tmp_user_array[4096][255];
+				int res = daemon_parser(tmp_user_array, cur_users);
+				users_timing_counter = users_timing_counter + 1;
+				
+	  			sleep(1);
+			}
+			else if (users_timing_counter == 10)
+			{
+				users_timing_counter = 0;
+			}
+			else
+			{
+				users_timing_counter = users_timing_counter + 1;
+			}
+			
 		}
 		else
 		{
-								// пингуем список юзеров
-			handle_USERS(sock_fd);
-	  		memset(cur_users, 0, sizeof(cur_users));
-	  		errwrap(recv(sock_fd, cur_users, MAX_BUF_SIZE, 0));
-	  		printf(cur_users);
-	  		printf("\n\n");
-	  		sleep(1);
+			if (users_timing_counter == 0)
+			{											// пингуем список юзеров
+													
+				pthread_mutex_lock(&CURSOR_MUTEX);
 
-								// принимаем сообщения
-			sleep(1);
+				handle_USERS(SOCK_FD);
+	  			memset(cur_users, 0, sizeof(cur_users));
+	  			errwrap(recv(SOCK_FD, cur_users, MAX_BUF_SIZE, 0));
+
+				pthread_mutex_unlock(&CURSOR_MUTEX);
+
+				char tmp_user_array[4096][255];
+				int res = daemon_parser(tmp_user_array, cur_users);
+				users_timing_counter = users_timing_counter + 1;
+				
+	  			sleep(1);
+			}
+			else if (users_timing_counter == 10)
+			{
+				users_timing_counter = 0;
+			}
+			else
+			{
+				users_timing_counter = users_timing_counter + 1;
+			}
+			
+			sleep(1);														
+			pthread_mutex_lock(&CURSOR_MUTEX);				// принимаем сообщения
+
 			memset(recv_buf, 0, sizeof(recv_buf));
-			errwrap(recv(sock_fd, recv_buf, 2048, 0));
-			printf(recv_buf);
-			printf("\n\n");
+			errwrap(recv(SOCK_FD, recv_buf, 2048, 0));
+
+			pthread_mutex_unlock(&CURSOR_MUTEX);
+
+			char tmp_msg_array[4096][255];
+			int res3 = daemon_parser(tmp_msg_array, recv_buf);
 			sleep(1);
 		}
+
     }
-	close(sock_fd);
+	close(SOCK_FD);
     return NULL;
 }
 
 void kek()						// самая полезная функция эвер
 {
-    while(1)
+	int i = 4;
+    while(i > 0)
     {
         sleep(1);
-        printf("kek\n");
-    }
-    
+		continue;
+        //printf("kek\n");
+		//i = i - 1;
+    }   
+}
+
+void update()									// заглушка (выпилить впоследствии)
+{
+	printf("\nupdated\n");
 }
 
 void daemon_loop()				// петля с потоком для демона
 {
 	pthread_t daemon_thread;
-
+	//printf("kek\n");
     pthread_create(&daemon_thread, NULL, daemon_checker, NULL);
-
+	//printf("kek\n");
     pthread_join(&daemon_thread, NULL);
 }
 
+
+// int main(int argc, char **argv) 
+// {
+// 	// main_loop();
+
+// 	//pthread_t 
+// 	pthread_mutex_init(&CURSOR_MUTEX, NULL);
+// 	daemon_loop();
+// 	//daemon_checker();
+
+// 	kek();
+//     exit(0);
+
+// }

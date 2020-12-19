@@ -561,7 +561,6 @@ void GetMainScreen()
     while (fgets(main_screen, 2812, fp) != NULL)
         printf("%s", main_screen);
     fclose(fp);
-    SetCursorPos(26, 29);
 }
 
 void CopyToBuffer(char source[], char target[], int start, int size)
@@ -639,8 +638,6 @@ int PressEnter(char* input, int sock_fd){
 	}
 
 }
-
-
 
 void AnalizeChar(int code)
 {
@@ -774,16 +771,11 @@ void BackspaceAnalizer()
     pthread_mutex_unlock(&CURSOR_MUTEX);
 }
 
-
-
 void MainHandler(char login[], char password[])
 {
     int input_char;
     int flag = 1;
-
-    int current_position = 0;
-    int last_position = 0;
-    GetMainScreen();
+    Update();
     while (flag)
     {
         input_char = getch();

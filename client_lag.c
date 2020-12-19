@@ -20,21 +20,27 @@
 #define CHAT_BUFFER_L 150 * 16
 #define USERS_POINTERS_L 45 * 16
 
+enum MainBackground
+{
+	BackgoundInput,
+	BackgroundChat,
+	BackgroundUsers
+};
 
-//int SCREEN = BackgoundInput;
+int SCREEN = BackgoundInput;
 
-// char INPUT[256] = {'\0'};
-// int INPUT_SIZER[256] = {0};
-// int INPUT_SIZER_POINTER = 0;
-// int INPUT_SIZER_LAST_SYMBOL_POINTER = 0;
+char INPUT[256] = {'\0'};
+int INPUT_SIZER[256] = {0};
+int INPUT_SIZER_POINTER = 0;
+int INPUT_SIZER_LAST_SYMBOL_POINTER = 0;
 int ISRUN = 1;								// ISRUN
 
 char CURSOR_X = 0;
 char CURSOR_Y = 0;
 
-char USER_LIST[4096][255];
+char USER_LIST[4096][256];
 
-char MSG_LIST[4096][255];
+char MSG_LIST[4096][256];
 int MSG_LIST_POINTER = 0;
 
 pthread_mutex_t CURSOR_MUTEX;
@@ -49,11 +55,104 @@ int SOCK_FD = 0;
 int SHIFT_X = 39;
 int SHIFT_Y = 28;
 
+// ====================================================
+// функция принимает массив с данными, количество элементов и координаты в терминале
+// пишет в столбик данные из массива начиная с указанных координат
+void print_massive_in_x_y(char massive[][256], int num_of_pieces, int start_segment, int x, int y) {
+	for (int a = 0; a < num_of_pieces; a++){
+			SetCursorPos(x, y);
+			printf(massive[start_segment + a]);
+			y = y + 1;
+	}
+}
+
+void GetMainScreen()
+{
+    char main_screen[4096];
+    FILE *fp;
+    char *file_name[32];
+    switch (SCREEN)
+    {
+        case BackgoundInput:
+        {
+            *file_name = "static/main_input.txt";
+            break;
+        }
+        case BackgroundChat:
+        {
+            *file_name = "static/main_chat.txt";
+            break;
+        }
+        case BackgroundUsers:
+        {
+            *file_name = "static/main_users.txt";
+        }
+        default:
+        {
+            system("clear");
+            printf("Неизвестный бэкграунд\n");
+            break;
+        }
+    }
+    fp = fopen(*file_name, "r");
+    SetCursorPos(0, 0);
+    while (fgets(main_screen, 2812, fp) != NULL)
+        printf("%s", main_screen);
+    fclose(fp);
+}
+
+void CopyToBuffer(char source[], char target[], int start, int size)
+{
+    int last = start + size;
+    for (int i = start; i < last; i++)
+        target[i - start] = source[i];
+}
+
+void PrintContentChat()
+{
+    print_massive_in_x_y(MSG_LIST, 16, MSG_LIST_POINTER, 39, 9);
+}
+
+int getPointer(int symbol_number)
+{
+    int result = 0;
+    for (int i = 0; i < symbol_number; i++)
+        result = result + INPUT_SIZER[i];
+    return result;
+}
+
+void PrintContentUsers()
+{
+    print_massive_in_x_y(USER_LIST, 16, 0, 133, 9);
+}
+
+void PrintContentInput()
+{
+    SetCursorPos(SHIFT_X, SHIFT_Y);
+    printf(INPUT);
+}
+
+void Update()
+{
+    pthread_mutex_lock(&CURSOR_MUTEX);
+    GetMainScreen();
+    PrintContentChat();
+    PrintContentUsers();
+    PrintContentInput();
+    SetCursorPos(CURSOR_X, CURSOR_Y);
+    pthread_mutex_unlock(&CURSOR_MUTEX);
+}
+
+
+
+// ====================================================
+
+
 //*******************SERVICE FUNCTIONS******************
 void err(char *msg, const char *arg, bool critical) {
     if(msg == NULL || strlen(msg) == 0) {
         msg = strerror(errno);
-		if (!strcmp(msg, "Success")) {
+		if (!strcmp(msg, "Выполнено")) {
 			return;
 		}
     }
@@ -435,6 +534,12 @@ int daemon_parser(char catched_commands[][255], char msg[])  		// парсер �
 			continue;
 		//	printf("Too fast\n");
 		}
+		else if (strstr(catched_commands[i], "Выполнено") != NULL)
+		{
+			system("clear");
+			printf("СIДОРЕНКО ДОЛБОЁБ\n");
+			exit(0);
+		}
 		else 
 		{
 			counter = -1;
@@ -452,7 +557,7 @@ int daemon_parser(char catched_commands[][255], char msg[])  		// парсер �
 		}
 	}
 	pthread_mutex_unlock(&CURSOR_MUTEX);
-	update();
+	Update();
 
 	return comms_count;
 }
@@ -478,9 +583,9 @@ void auth(int sock_fd, char login[], char password[])			// авторизаци�
 void *daemon_checker(void * arg) 				// собсна демон
 {
 	
-	pthread_mutex_lock(&CURSOR_MUTEX);
-	SOCK_FD = sock_init();	
-	pthread_mutex_unlock(&CURSOR_MUTEX);					// наш сокет на приём данных (вырезать впоследствии)
+	// pthread_mutex_lock(&CURSOR_MUTEX);
+	// SOCK_FD = sock_init();	
+	// pthread_mutex_unlock(&CURSOR_MUTEX);					// наш сокет на приём данных (вырезать впоследствии)
 
 	char cur_users[MAX_BUF_SIZE];
 	char recv_buf[MAX_BUF_SIZE];
@@ -493,7 +598,7 @@ void *daemon_checker(void * arg) 				// собсна демон
     {
 		pthread_mutex_lock(&CURSOR_MUTEX);
 
-		auth(SOCK_FD, "agaffosh", "123");		// авторизируемся (вырезать впоследствии)
+		//auth(SOCK_FD, "agaffosh", "123");		// авторизируемся (вырезать впоследствии)
 
 		pthread_mutex_unlock(&CURSOR_MUTEX);
 		sleep(1);
@@ -510,7 +615,7 @@ void *daemon_checker(void * arg) 				// собсна демон
 
 		if (ret == -1)
 		{
-			printf("poll error");
+		//	printf("poll error");
 			break;
 		}
 		else if (ret == 0)
@@ -584,7 +689,7 @@ void *daemon_checker(void * arg) 				// собсна демон
 		}
 
     }
-	close(SOCK_FD);
+	//close(SOCK_FD);
     return NULL;
 }
 
@@ -600,10 +705,12 @@ void kek()						// самая полезная функция эвер
     }   
 }
 
+/*
 void update()									// заглушка (выпилить впоследствии)
 {
 	printf("\nupdated\n");
 }
+*/
 
 void daemon_loop()				// петля с потоком для демона
 {

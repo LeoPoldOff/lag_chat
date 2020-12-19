@@ -8,38 +8,6 @@
 #include <semaphore.h>
 #include "parser.c"
 
-#define CHAT_BUFFER_L 150 * 16
-#define USERS_POINTERS_L 45 * 16
-
-enum MainBackground
-{
-    BackgoundInput = 0,
-    BackgroundChat = 1,
-    BackgroundUsers = 2
-};
-
-
-int SCREEN = BackgoundInput;
-
-char INPUT[256] = {'\0'};
-int INPUT_SIZER[256] = {0};
-int INPUT_SIZER_POINTER = 0;
-int INPUT_SIZER_LAST_SYMBOL_POINTER = 0;
-
-char CURSOR_X = 0;
-char CURSOR_Y = 0;
-
-pthread_mutex_t CURSOR_MUTEX;
-
-char CHAT[65536] = {'\0'};
-int CHAT_POINTER = 0;
-
-char USERS[4096] = {'\0'};
-
-int SOCKET_HUY_EGO_ZNAET = 0;
-
-int SHIFT_X = 39;
-int SHIFT_Y = 28;
 
 
 int getche() 
@@ -528,95 +496,15 @@ void AuthHandler(char log[], char pass[])
 // ============================================================================================================================================================
 // ============================================================================================================================================================
 
-void GetMainScreen()
-{
-    char main_screen[4096];
-    FILE *fp;
-    char *file_name[32];
-    switch (SCREEN)
-    {
-        case BackgoundInput:
-        {
-            *file_name = "static/main_input.txt";
-            break;
-        }
-        case BackgroundChat:
-        {
-            *file_name = "static/main_chat.txt";
-            break;
-        }
-        case BackgroundUsers:
-        {
-            *file_name = "static/main_users.txt";
-        }
-        default:
-        {
-            system("clear");
-            printf("Неизвестный бэкграунд\n");
-            break;
-        }
-    }
-    fp = fopen(*file_name, "r");
-    SetCursorPos(0, 0);
-    while (fgets(main_screen, 2812, fp) != NULL)
-        printf("%s", main_screen);
-    fclose(fp);
-}
 
-void CopyToBuffer(char source[], char target[], int start, int size)
-{
-    int last = start + size;
-    for (int i = start; i < last; i++)
-        target[i - start] = source[i];
-}
-
-void PrintContentChat()
-{
-    char content[16][256];
-    char string_content[CHAT_BUFFER_L] = {'\0'};
-    CopyToBuffer(CHAT, string_content, CHAT_POINTER, CHAT_BUFFER_L);
-    int count = long_str_parser(content, string_content, 150);
-    print_massive_in_x_y(string_content, count, 39, 9);
-}
-
-int getPointer(int symbol_number)
-{
-    int result = 0;
-    for (int i = 0; i < symbol_number; i++)
-        result = result + INPUT_SIZER[i];
-    return result;
-}
-
-void PrintContentUsers()
-{
-    char content[16][256];
-    char string_content[USERS_POINTERS_L] = {'\0'};
-    int user_pointer = getPointer(INPUT_SIZER_POINTER);
-    CopyToBuffer(USERS, string_content, user_pointer, USERS_POINTERS_L);
-    int count = long_str_parser(content, string_content, 45);
-    print_massive_in_x_y(string_content, count, 133, 9);
-}
-
-void PrintContentInput()
-{
-    SetCursorPos(SHIFT_X, SHIFT_Y);
-    printf(INPUT);
-}
-
-void Update()
-{
-    pthread_mutex_lock(&CURSOR_MUTEX);
-    GetMainScreen();
-    PrintContentChat();
-    PrintContentUsers();
-    PrintContentInput();
-    SetCursorPos(CURSOR_X, CURSOR_Y);
-    pthread_mutex_unlock(&CURSOR_MUTEX);
-}
-
-int PressEnter(char* input, int sock_fd){
+int PressEnter(int sock_fd){
 	char args[50][100];
-	int res = request_parser(input, args);
+	int res = request_parser(INPUT, args);
+
+    system("clear");
+    printf("%d", res);
+    printf("\n");
+    exit(0);
 
     pthread_mutex_lock(&CURSOR_MUTEX);
     CURSOR_X = SHIFT_X;
@@ -626,13 +514,14 @@ int PressEnter(char* input, int sock_fd){
     INPUT_SIZER_LAST_SYMBOL_POINTER = 0;
 
 	if (res == -1){
-		memset(input, '\0', 256);
+		memset(INPUT, '\0', 256);
         pthread_mutex_unlock(&CURSOR_MUTEX);
 		return -1;
 	}
-	else if (res == 0 || res == 1){
-		extern sendbuf(sock_fd, input);
-		memset(input, '\0', 256);
+	else if (res == 0 | res == 1){
+        exit(0);
+		extern sendbuf(sock_fd, INPUT);
+		memset(INPUT, '\0', 256);
         pthread_mutex_unlock(&CURSOR_MUTEX);
 		return 1;
 	}
@@ -784,7 +673,7 @@ void MainHandler(char login[], char password[])
             // Enter
             case 10:
                 {
-                    PressEnter(INPUT, SOCKET_HUY_EGO_ZNAET);
+                    PressEnter(SOCK_FD);
                     break;
                 }
             // ESCAPE-SEQUENCE
@@ -846,12 +735,15 @@ void MainHandler(char login[], char password[])
     }
 }
 
-
 // BackspaceHandler(char input[], int left_shift, int shift_y, int* max_symbol_count, int* current_symbol, int symbols_counter[])
 // AnalizeInputChar(int code, char array[], int is_pass, int* current_symbol, int* max_symbol_count, int symbols_counter[])
 int main()
 {
     setlocale( LC_ALL, "");
+
+    char clean[256] = {'\0'};
+    strcpy(INPUT, clean);
+    
     pthread_mutex_init(&CURSOR_MUTEX, NULL);
 
     CURSOR_X = 39;
@@ -861,8 +753,20 @@ int main()
     char password[64] = {'\n'};
 
     AuthHandler(login, password);
+    
+    SOCK_FD = sock_init();
+    auth(SOCK_FD, login, password);
+    
+    daemon_loop();
     system("clear");
     MainHandler(login, password);
     system("clear");    
     pthread_mutex_destroy(&CURSOR_MUTEX);
+    
+   
+//    char b[] = "SNDALL|msg=vaflya";
+//    char args[50][100];
+//    strcpy(INPUT, b);
+//    int i = request_parser(INPUT, args);
+//    printf("%d", i);
 }

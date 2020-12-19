@@ -96,20 +96,11 @@ void SetCursorPos(int XPos, int YPos)
     printf("\033[%d;%dH", YPos+1, XPos+1);
 }
 
-// функция принимает массив с данными, количество элементов и координаты в терминале
-// пишет в столбик данные из массива начиная с указанных координат
-void print_massive_in_x_y(char massive[][256], int num_of_pieces, int x, int y) {
-	for (int a = 0; a < num_of_pieces; a++){
-			SetCursorPos(x, y);
-			printf(massive[a]);
-			y = y + 1;
-	}
-}
 
 // функция принимает указатель на сообщение, и массив для складирование значений аргументов
 // возвращает -1 если была ошибка при вводе, 0 если всё ок, но аргументов нет и 1 если всё ок и аргументы есть 
-int request_parser(char* msg, char args[][50]){
-	char massive[10][100];
+int request_parser(char msg[], char args[][100]){
+	char massive[50][256];
 	char* work_str = malloc(25);
 	char* work_str1 = malloc(25);
 	char* null_str = malloc(25);

@@ -22,12 +22,7 @@ int long_str_parser(char massive1[][256], char* msg, int len) {
 	int counter = -1; // счётчик бегущий по кусочкам
 	int slot_counter = 0; // счётчик бежит по массиву для результата
 	int num_of_pieces = 0;
-	
-	if (msg_len <= len){
-		printf("waste of time");
-		return 1;
-	}
-	
+
 	for (int e = 0; e < msg_len; e++){
 		counter = counter + 1;
 		res_massive[counter] = msg[e];
@@ -128,6 +123,7 @@ int request_parser(char* msg, char args[][50]){
 	// memcpy(arg_header1, massive[1], 10);
 	// memcpy(arg_header2, massive[1], 10);
 	
+	/*
 	printf("%s\n", massive[0]);
 	printf("%s\n", massive[1]);
 	printf("%s\n", massive[2]);
@@ -138,44 +134,45 @@ int request_parser(char* msg, char args[][50]){
 	printf("%s\n", arg_header1);
 	printf("%d\n", strlen(command));
 	printf("%d\n", strlen(arg_header1));
+	*/
 	
 	if (strcmp(command, "ECHO") == 0) {
 		if (strlen(massive[1]) != 0){
-			printf("%s\n", "Вставай Саня, ты опять обосрался!");
+			// printf("%s\n", "Вставай Саня, ты опять обосрался!");
 			return -1;
 		}
 		return 0;
 	}
 	else if (strcmp(command, "PING") == 0) {
 		if (strlen(massive[1]) != 0){
-			printf("%s\n", "Вставай Саня, ты опять обосрался!");
+			// printf("%s\n", "Вставай Саня, ты опять обосрался!");
 			return -1;
 		}
 		return 0;
 	}
 	else if (strcmp(command, "USERS") == 0) {
 		if (strlen(massive[1]) != 0){
-			printf("%s\n", "Вставай Саня, ты опять обосрался!");
+			// printf("%s\n", "Вставай Саня, ты опять обосрался!");
 			return -1;
 		}
 		return 0;
 	}
 	else if (strcmp(command, "HELP") == 0) {
 		if (strlen(massive[1]) != 0){
-			printf("%s\n", "Вставай Саня, ты опять обосрался!");
+			// printf("%s\n", "Вставай Саня, ты опять обосрался!");
 			return -1;
 		}
 		return 0;
 	}
 	else if (strcmp(command, "SNDALL") == 0) {
 		if (strlen(massive[1]) == 0){
-			printf("%s\n", "Вставай Саня, ты опять обосрался!1");
+			// printf("%s\n", "Вставай Саня, ты опять обосрался!1");
 			return -1;
 		}
 		// strncpy(arg_header1, massive[1], 4);
 		memcpy(arg_header1, massive[1], 4);
 		if (strcmp(arg_header1, "msg=") != 0){
-			printf("%s\n", "Вставай Саня, ты трижды обосрался!2");
+			// printf("%s\n", "Вставай Саня, ты трижды обосрался!2");
 			return -1;
 		} 
 		memset(work_str, ' ', strlen(massive[1]) - 4);
@@ -184,7 +181,7 @@ int request_parser(char* msg, char args[][50]){
 			work_str[a - 4] = massive[1][a];
 
 		if (strcmp(work_str, null_str) == 0){
-			printf("%s\n", "пустой первый аргумент");
+			// printf("%s\n", "пустой первый аргумент");
 			return -1;
 		}
 		
@@ -193,18 +190,18 @@ int request_parser(char* msg, char args[][50]){
 	}
 	else if (strcmp(command, "SEND") == 0) {
 		if (strlen(massive[1]) == 0 || strlen(massive[2]) == 0){
-			printf("%s\n", "Вставай Саня, ты опять обосрался!1");
+			// printf("%s\n", "Вставай Саня, ты опять обосрался!1");
 			return -1;
 		}
 		// strncpy(arg_header1, massive[1], 4);
 		memcpy(arg_header1, massive[1], 9);
 		if (strcmp(arg_header1, "username=") != 0){
-			printf("%s\n", "Вставай Саня, ты трижды обосрался!2");
+			// printf("%s\n", "Вставай Саня, ты трижды обосрался!2");
 			return -1;
 		}
 		memcpy(arg_header2, massive[2], 4);
 		if (strcmp(arg_header2, "msg=") != 0){
-			printf("%s\n", "Вставай Саня, ты трижды обосрался!3");
+			// printf("%s\n", "Вставай Саня, ты трижды обосрался!3");
 			return -1;
 		} 
 		memset(work_str, ' ', strlen(massive[1]) - 9);
@@ -213,7 +210,7 @@ int request_parser(char* msg, char args[][50]){
 			work_str[a - 9] = massive[1][a];
 		// memcpy(arg_header1, massive[1], 9);
 		if (strcmp(work_str, null_str) == 0){
-			printf("%s\n", "пустой первый аргумент");
+			// printf("%s\n", "пустой первый аргумент");
 			return -1;
 		}
 		
@@ -223,7 +220,7 @@ int request_parser(char* msg, char args[][50]){
 			work_str1[a - 4] = massive[2][a];
 
 		if (strcmp(work_str1, null_str1) == 0){
-			printf("%s\n", "пустой второй аргумент");
+			// printf("%s\n", "пустой второй аргумент");
 			return -1;
 		}
 		
@@ -233,18 +230,18 @@ int request_parser(char* msg, char args[][50]){
 	}
 	else if (strcmp(command, "LOGIN") == 0) {
 		if (strlen(massive[1]) == 0 || strlen(massive[2]) == 0){
-			printf("%s\n", "Вставай Саня, ты опять обосрался!1");
+			// printf("%s\n", "Вставай Саня, ты опять обосрался!1");
 			return -1;
 		}
 		// strncpy(arg_header1, massive[1], 4);
 		memcpy(arg_header1, massive[1], 9);
 		if (strcmp(arg_header1, "username=") != 0){
-			printf("%s\n", "Вставай Саня, ты трижды обосрался!2");
+			// printf("%s\n", "Вставай Саня, ты трижды обосрался!2");
 			return -1;
 		}
 		memcpy(arg_header2, massive[2], 9);
 		if (strcmp(arg_header2, "password=") != 0){
-			printf("%s\n", "Вставай Саня, ты трижды обосрался!3");
+			// printf("%s\n", "Вставай Саня, ты трижды обосрался!3");
 			return -1;
 		} 
 		memset(work_str, ' ', strlen(massive[1]) - 9);
@@ -253,7 +250,7 @@ int request_parser(char* msg, char args[][50]){
 			work_str[a - 9] = massive[1][a];
 		// memcpy(arg_header1, massive[1], 9);
 		if (strcmp(work_str, null_str) == 0){
-			printf("%s\n", "пустой первый аргумент");
+			// printf("%s\n", "пустой первый аргумент");
 			return -1;
 		}
 		
@@ -263,7 +260,7 @@ int request_parser(char* msg, char args[][50]){
 			work_str1[a - 9] = massive[2][a];
 
 		if (strcmp(work_str1, null_str1) == 0){
-			printf("%s\n", "пустой второй аргумент");
+			// printf("%s\n", "пустой второй аргумент");
 			return -1;
 		}
 		
@@ -272,7 +269,7 @@ int request_parser(char* msg, char args[][50]){
 		return 0;
 	}
 	else {
-		printf("%s\n", "Вставай Саня, ты обосрался!4");
+		// printf("%s\n", "Вставай Саня, ты обосрался!4");
 		return -1;
 	}
 	return 1;

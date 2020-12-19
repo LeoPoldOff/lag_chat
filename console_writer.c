@@ -11,6 +11,37 @@
 #define CHAT_BUFFER_L 150 * 16
 #define USERS_POINTERS_L 45 * 16
 
+enum MainBackground
+{
+    BackgoundInput = 0,
+    BackgroundChat = 1,
+    BackgroundUsers = 2
+};
+
+
+int SCREEN = BackgoundInput;
+
+char INPUT[256] = {'\0'};
+int INPUT_SIZER[256] = {0};
+int INPUT_SIZER_POINTER = 0;
+int INPUT_SIZER_LAST_SYMBOL_POINTER = 0;
+
+char CURSOR_X = 0;
+char CURSOR_Y = 0;
+
+pthread_mutex_t CURSOR_MUTEX;
+
+char CHAT[65536] = {'\0'};
+int CHAT_POINTER = 0;
+
+char USERS[4096] = {'\0'};
+
+int SOCKET_HUY_EGO_ZNAET = 0;
+
+int SHIFT_X = 39;
+int SHIFT_Y = 28;
+
+
 int getche() 
 {
 	int ch;
@@ -497,28 +528,6 @@ void AuthHandler(char log[], char pass[])
 // ============================================================================================================================================================
 // ============================================================================================================================================================
 
-enum MainBackground
-{
-    BackgoundInput = 0,
-    BackgroundChat = 1,
-    BackgroundUsers = 2
-};
-
-
-int SCREEN = BackgoundInput;
-char INPUT[256] = {'\0'};
-char CURSOR_X = 0;
-char CURSOR_Y = 0;
-
-pthread_mutex_t CURSOR_MUTEX;
-
-char CHAT[65536] = {'\0'};
-int CHAT_POINTER = 0;
-
-char USERS[4096] = {'\0'};
-int USERS_POINTER = 0;
-
-
 void GetMainScreen()
 {
     char main_screen[4096];
@@ -555,42 +564,43 @@ void GetMainScreen()
     SetCursorPos(26, 29);
 }
 
-void CopyToBuffer(char source[], char target[], int start)
+void CopyToBuffer(char source[], char target[], int start, int size)
 {
-    int last = start + strlen(target);
-    int size = strlen(source);
+    int last = start + size;
     for (int i = start; i < last; i++)
-    {
-        if (size <= i)
-        {
-            system("clear");
-            printf("Вылезли за границы массива при копировании в буфер\n");
-        }
         target[i - start] = source[i];
-    }
 }
 
 void PrintContentChat()
 {
     char content[16][256];
     char string_content[CHAT_BUFFER_L] = {'\0'};
-    CopyToBuffer(CHAT, string_content, CHAT_POINTER);
+    CopyToBuffer(CHAT, string_content, CHAT_POINTER, CHAT_BUFFER_L);
     int count = long_str_parser(content, string_content, 150);
-    print_massive_in_x_y(string_content, count, 25, 9);
+    print_massive_in_x_y(string_content, count, 39, 9);
+}
+
+int getPointer(int symbol_number)
+{
+    int result = 0;
+    for (int i = 0; i < symbol_number; i++)
+        result = result + INPUT_SIZER[i];
+    return result;
 }
 
 void PrintContentUsers()
 {
     char content[16][256];
     char string_content[USERS_POINTERS_L] = {'\0'};
-    CopyToBuffer(USERS, string_content, USERS_POINTER);
+    int user_pointer = getPointer(INPUT_SIZER_POINTER);
+    CopyToBuffer(USERS, string_content, user_pointer, USERS_POINTERS_L);
     int count = long_str_parser(content, string_content, 45);
-    print_massive_in_x_y(string_content, count, 85, 10);
+    print_massive_in_x_y(string_content, count, 133, 9);
 }
 
 void PrintContentInput()
 {
-    SetCursorPos(26, 29);
+    SetCursorPos(SHIFT_X, SHIFT_Y);
     printf(INPUT);
 }
 
@@ -605,36 +615,163 @@ void Update()
     pthread_mutex_unlock(&CURSOR_MUTEX);
 }
 
-
 int PressEnter(char* input, int sock_fd){
 	char args[50][100];
 	int res = request_parser(input, args);
+
+    pthread_mutex_lock(&CURSOR_MUTEX);
+    CURSOR_X = SHIFT_X;
+    for (int i = 0; i < 256; i++)
+        INPUT_SIZER[i] = 0;
+    INPUT_SIZER_POINTER = 0;
+    INPUT_SIZER_LAST_SYMBOL_POINTER = 0;
+
 	if (res == -1){
 		memset(input, '\0', 256);
+        pthread_mutex_unlock(&CURSOR_MUTEX);
 		return -1;
 	}
 	else if (res == 0 || res == 1){
 		extern sendbuf(sock_fd, input);
 		memset(input, '\0', 256);
+        pthread_mutex_unlock(&CURSOR_MUTEX);
 		return 1;
 	}
 
 }
 
-/*
-void AnalizeChar()
+
+
+void AnalizeChar(int code)
 {
-    // TODO
+    if (INPUT_SIZER_LAST_SYMBOL_POINTER >= 256)
+        return; 
+    pthread_mutex_lock(&CURSOR_MUTEX);
+    int position = getPointer(INPUT_SIZER_POINTER);
+    int insert = 0;
+    int increment = 1;
+    if (code > 31 && code < 127)
+    {
+        if (INPUT_SIZER[INPUT_SIZER_POINTER] == 0)
+        {         
+            INPUT_SIZER[INPUT_SIZER_POINTER] = 1;
+            
+            INPUT[position] = (char)code;
+
+            INPUT_SIZER_POINTER = INPUT_SIZER_POINTER + 1;
+            INPUT_SIZER_LAST_SYMBOL_POINTER = INPUT_SIZER_LAST_SYMBOL_POINTER + 1;
+        }
+        else
+        {
+            INPUT_SIZER[INPUT_SIZER_POINTER] = 1;
+
+            ShiftSequence(1, INPUT_SIZER_POINTER, INPUT_SIZER_LAST_SYMBOL_POINTER, INPUT, INPUT_SIZER);
+            insert = 1;
+            
+            INPUT[position] = (char)code;
+
+            INPUT_SIZER_POINTER = INPUT_SIZER_POINTER + 1;
+            INPUT_SIZER_LAST_SYMBOL_POINTER = INPUT_SIZER_LAST_SYMBOL_POINTER + 1;
+        }
+    }
+    if (code == 208 || code == 209)
+    {
+        char value = getch();
+        switch (INPUT_SIZER[INPUT_SIZER_POINTER])
+        {
+            case 0:
+            {
+                INPUT_SIZER[INPUT_SIZER_POINTER] = 2;
+            
+                INPUT[position] = (char)code;
+                INPUT[position + 1] = (char)value;
+
+                INPUT_SIZER_POINTER = INPUT_SIZER_POINTER + 1;
+                INPUT_SIZER_LAST_SYMBOL_POINTER = INPUT_SIZER_LAST_SYMBOL_POINTER + 1;
+                break;
+            }
+            default:
+            {
+                INPUT_SIZER[INPUT_SIZER_POINTER] = 2;
+
+                ShiftSequence(2, INPUT_SIZER_POINTER, INPUT_SIZER_LAST_SYMBOL_POINTER, INPUT, INPUT_SIZER);
+                insert = 1;
+                
+                INPUT[position] = (char)code;
+                INPUT[position + 1] = (char)value;
+
+                INPUT_SIZER_POINTER = INPUT_SIZER_POINTER + 1;
+                INPUT_SIZER_LAST_SYMBOL_POINTER = INPUT_SIZER_LAST_SYMBOL_POINTER + 1;
+                                
+                break;
+            }
+        }   
+    }
+
+    CURSOR_X = SHIFT_X + INPUT_SIZER_POINTER;
+    pthread_mutex_unlock(&CURSOR_MUTEX);
 }
 
-void MoveCursorHorizontal()
+void MoveCursorHorizontal(int direction)
 {
-    // TODO
+    if (direction > 0)
+    {
+        if (INPUT_SIZER_POINTER < INPUT_SIZER_LAST_SYMBOL_POINTER)
+            INPUT_SIZER_POINTER = INPUT_SIZER_POINTER + 1;
+    }
+    if (direction < 0)
+    {
+        if (INPUT_SIZER_POINTER > 0)
+            INPUT_SIZER_POINTER = INPUT_SIZER_POINTER - 1;
+    }
+    CURSOR_X = SHIFT_X + INPUT_SIZER_POINTER;
 }
 
-void BackspaceHandler()
+void BackspaceAnalizer()
 {
-    // TODO
+    if (INPUT_SIZER_POINTER == 0)
+        return;
+    pthread_mutex_lock(&CURSOR_MUTEX);
+    
+    int pointer_position = INPUT_SIZER_POINTER - 1;
+    int shift = INPUT_SIZER[pointer_position];
+
+    char *buffer = malloc(64);
+    int buffer_pointers[32] = {0};
+
+    int end_shift = INPUT_SIZER[INPUT_SIZER_LAST_SYMBOL_POINTER];
+    if (end_shift == 0)
+        end_shift++;
+
+    int start = getPointer(INPUT_SIZER_POINTER);
+    int end = getPointer(INPUT_SIZER_LAST_SYMBOL_POINTER) + end_shift;
+
+    for (int i = start; i < end; i++)
+    {
+        buffer[i - start] = INPUT[i];
+    }
+    for (int i = 0; i < shift - 1; i++)
+        buffer[i - start + end] = '\n';
+    int prev = getPointer(pointer_position);
+    for (int i = 0; i < end - start + shift - 1; i++)
+    {
+        INPUT[prev + i] = buffer[i];   
+    }
+
+    for (int i = INPUT_SIZER_POINTER; i <= INPUT_SIZER_LAST_SYMBOL_POINTER; i++)
+    {
+        buffer_pointers[i - INPUT_SIZER_POINTER] = INPUT_SIZER[i];
+    }
+    for (int i = 0; i <= INPUT_SIZER_LAST_SYMBOL_POINTER - INPUT_SIZER_POINTER; i++)
+    {
+        INPUT_SIZER[i + INPUT_SIZER_POINTER - 1] = buffer_pointers[i];
+    }
+    // Печать в консоль того, как сделали все свои дела
+    INPUT_SIZER_LAST_SYMBOL_POINTER = INPUT_SIZER_LAST_SYMBOL_POINTER - 1;
+    INPUT_SIZER_POINTER = INPUT_SIZER_POINTER - 1;
+    
+    CURSOR_X = SHIFT_X + INPUT_SIZER_POINTER;
+    pthread_mutex_unlock(&CURSOR_MUTEX);
 }
 
 
@@ -655,7 +792,7 @@ void MainHandler(char login[], char password[])
             // Enter
             case 10:
                 {
-                    PressEnter();
+                    PressEnter(INPUT, SOCKET_HUY_EGO_ZNAET);
                     break;
                 }
             // ESCAPE-SEQUENCE
@@ -674,19 +811,19 @@ void MainHandler(char login[], char password[])
                             }
                             case 66:
                             {
-                                // Change current login
+                                // Change current window
                                 break;
                             }
                             case 67:
                             {
                                 // Move right
-                                HorizontalCursorMove(1, left_shift, login_position, login_max_symbols_counter, &login_symbols_pointer);
+                                MoveCursorHorizontal(1);
                                 break;
                             }
                             case 68:
                             {
-                                // Move right
-                                HorizontalCursorMove(-1, left_shift, login_position, login_max_symbols_counter, &login_symbols_pointer); 
+                                // Move left
+                                MoveCursorHorizontal(-1); 
                                 break;
                             }
                             default:
@@ -696,36 +833,27 @@ void MainHandler(char login[], char password[])
                     else
                     {
                         // Exit
-                        system("clear");
-                        printf("Exit\n");
-                        exit(0);
+                        flag = 0;
                     }
                     break;
                 }        
             // Backspace
             case 127: 
             {
-                // Delete symbol
-               if (login_symbols_pointer > 0)
-                    BackspaceHandler(0, login, left_shift, login_position,
-                        &login_max_symbols_counter, &login_symbols_pointer, login_counter);
+                BackspaceAnalizer();
                 break;
             }
             default:
             {
                 // Some input
-                if (login_symbols_pointer < 32)
-                {
-                    AnalizeInputChar(input_char, login, 0, &login_symbols_pointer, &login_max_symbols_counter, login_counter, left_shift, login_position);
-                }
+                AnalizeChar(input_char);
                 break;
             }
         }
-        // Update screen
+        Update();
     }
 }
 
-*/
 
 // BackspaceHandler(char input[], int left_shift, int shift_y, int* max_symbol_count, int* current_symbol, int symbols_counter[])
 // AnalizeInputChar(int code, char array[], int is_pass, int* current_symbol, int* max_symbol_count, int symbols_counter[])
@@ -734,27 +862,15 @@ int main()
     setlocale( LC_ALL, "");
     pthread_mutex_init(&CURSOR_MUTEX, NULL);
 
-    /*
+    CURSOR_X = 39;
+    CURSOR_Y = 28;
+
     char login[64] = {'\n'};
     char password[64] = {'\n'};
 
     AuthHandler(login, password);
     system("clear");
     MainHandler(login, password);
-    */
-
-    char k[] = "Гоша вообще хорош. Демон ебошит!";
-    char b[] = "Гоша";
-    for (int i = 0; i <strlen(k); i++)
-    {
-       CHAT[i] = k[i];
-    }
-
-    for (int i = 0; i <strlen(b); i++)
-    {
-       USERS[i] = b[i];
-    }
-
-    Update();
+    system("clear");    
     pthread_mutex_destroy(&CURSOR_MUTEX);
 }

@@ -5,9 +5,9 @@
 #include <stdlib.h>
 #include <pthread.h> 
 #include <locale.h>
+#include <semaphore.h>
+#include "parser.c"
 
-
-int input_esc;
 
 int getche() 
 {
@@ -22,9 +22,7 @@ int getche()
 	tcsetattr( STDIN_FILENO, TCSANOW, &oldt );
 	return ch;
 }
-//
-// getch() - ввод одного символа без эхо
-//
+
 int getch() {
 	int ch;
 	struct termios oldt, newt;
@@ -37,12 +35,12 @@ int getch() {
 	tcsetattr( STDIN_FILENO, TCSANOW, &oldt );
 	return ch;
 }
-
+/*
 void SetCursorPos(int XPos, int YPos)
 {
     printf("\033[%d;%dH", YPos+1, XPos+1);
 }
-
+*/
 void SetInputCursor()
 {
     SetCursorPos(5, 25);
@@ -62,11 +60,11 @@ void GetAuthScreen()
     printf("%d\n", val);
     if (val == 1)
     {
-        *file_name = "auth_02.txt";
+        *file_name = "static/auth_02.txt";
     }
     else
     {
-        *file_name = "auth_01.txt";
+        *file_name = "static/auth_01.txt";
     }
     fp = fopen(*file_name, "r");
 
@@ -75,7 +73,7 @@ void GetAuthScreen()
         printf("%s", auth_screen);
 
     fclose(fp);
-    SetCursorPos(29, 14);
+    SetCursorPos(82, 26);
 }
 
 int getNumberPosition(int counter[], int symbol_counter)
@@ -110,7 +108,7 @@ void HorizontalCursorMove(int direction, int left_shift,  int shift_y, int max_s
     }      
 }
 
-void PrintNewSequence(int left_shift,  int shift_y, int current_symbol, int max_symbol_count, char input[], int symbols_counter[])
+void PrintNewSequence(int is_pass, int left_shift,  int shift_y, int current_symbol, int max_symbol_count, char input[], int symbols_counter[])
 {
     SetCursorPos(left_shift , shift_y);
     int empty_cell_count = 0;
@@ -124,9 +122,19 @@ void PrintNewSequence(int left_shift,  int shift_y, int current_symbol, int max_
             printf(" ");
         }
         if (count_symbols == 1)
-            printf("%c", input[pos_pointer]);
+        {
+            if (is_pass)
+                printf("*");
+            else
+                printf("%c", input[pos_pointer]);    
+        }
         if (count_symbols == 2)
-            printf("%c%c", input[pos_pointer], input[pos_pointer + 1]);
+        {
+            if (is_pass)
+                printf("*");
+            else
+                printf("%c%c", input[pos_pointer], input[pos_pointer + 1]);
+        }
     }
     
     // Обновление переменных
@@ -221,7 +229,7 @@ void AnalizeInputChar(int code, char array[], int is_pass, int* current_symbol, 
     }
 
     if (insert)
-        PrintNewSequence(left_shift, shift_y, *current_symbol, *max_symbol_count, array, symbols_counter);
+        PrintNewSequence(is_pass, left_shift, shift_y, *current_symbol, *max_symbol_count, array, symbols_counter);
 
     // printf("\nPO-RUSSIAN:\n");
     // for (int i = 0; array[i]; i++)
@@ -237,18 +245,6 @@ void AnalizeInputChar(int code, char array[], int is_pass, int* current_symbol, 
     // printf("\n");
 }
 
-void Zerolizer(char input[])
-{
-    for (int i = 0; i < 32; i++)
-        input[i] = '\n';
-}
-
-void ZerolizerI(int input[])
-{
-    for (int i = 0; i < 32; i++)
-        input[i] = 0;
-}
-
 void cleaner(int size_array[], char input[], int last_element)
 {
     int start = getNumberPosition(size_array, last_element);
@@ -256,7 +252,7 @@ void cleaner(int size_array[], char input[], int last_element)
         input[i] = '\n';
 }
 
-void BackspaceHandler(char input[], int left_shift, int shift_y, int* max_symbol_count, int* current_symbol, int symbols_counter[])
+void BackspaceHandler(int is_pass, char input[], int left_shift, int shift_y, int* max_symbol_count, int* current_symbol, int symbols_counter[])
 {
     if (*current_symbol == 0)
         return;
@@ -267,8 +263,7 @@ void BackspaceHandler(char input[], int left_shift, int shift_y, int* max_symbol
     // printf("shift = %d\n", shift);
 
     char *buffer = malloc(64);
-    int buffer_pointers[32];
-    ZerolizerI(buffer_pointers);
+    int buffer_pointers[32] = {0};
 
     int end_shift = symbols_counter[*max_symbol_count];
     if (end_shift == 0)
@@ -313,36 +308,32 @@ void BackspaceHandler(char input[], int left_shift, int shift_y, int* max_symbol
     *max_symbol_count = *max_symbol_count - 1;
     *current_symbol = *current_symbol - 1;
 
-    PrintNewSequence(left_shift, shift_y, *current_symbol, *max_symbol_count + 1, input, symbols_counter);    
+    PrintNewSequence(is_pass, left_shift, shift_y, *current_symbol, *max_symbol_count + 1, input, symbols_counter);    
 }
 
-
-int AuthHandler()
-{
-    
-
+void AuthHandler(char log[], char pass[])
+{  
     int input_char;
     int flag = 1;
+
+    char login[64] = {'\n'};
+    char password[64] = {'\n'};
 
     int is_login = 1;
 
     int login_symbols_pointer = 0;   
     int login_counter[32] = {0};
-    char *login = malloc(64);
-    Zerolizer(login);
 
 
     int password_symbols_pointer = 0;
     int password_counter[32] = {0};
-    char *password = malloc(64);
-    Zerolizer(password);
 
     int password_max_symbols_counter = 0;
     int login_max_symbols_counter = 0;
     
-    int left_shift = 29;
-    int login_position = 14;
-    int password_position = 18;
+    int left_shift = 82;
+    int login_position = 26;
+    int password_position = 30;
 
     system("clear");
     GetAuthScreen();
@@ -360,10 +351,6 @@ int AuthHandler()
                     }
                     else
                     {
-                        system("clear");
-                        printf("Press Enter\n");
-                        printf(login, "\n");
-                        printf(password, "\n");
                         flag = 0;
                     }
                     break;
@@ -438,13 +425,13 @@ int AuthHandler()
                 if (is_login)
                 {
                     if (login_symbols_pointer > 0)
-                        BackspaceHandler(login, left_shift, login_position,
+                        BackspaceHandler(0, login, left_shift, login_position,
                          &login_max_symbols_counter, &login_symbols_pointer, login_counter);
                 }
                 else
                 {
                     if (password_symbols_pointer > 0)
-                        BackspaceHandler(password, left_shift, password_position, 
+                        BackspaceHandler(1, password, left_shift, password_position, 
                         &password_max_symbols_counter, &password_symbols_pointer, password_counter);
                 }
                 break;
@@ -496,51 +483,174 @@ int AuthHandler()
             }
         }
     }
-   return 0;
+   
+   for (int i = 0; i < 64; i++)
+   {
+       log[i] = login[i];
+       pass[i] = password[i];
+   }
+
 }
 
+// ============================================================================================================================================================
+// ============================================================================================================================================================
+
+char INPUT[256] = {'\0'};
+char CURSOR_X = 0;
+char CURSOR_Y = 0;
+
+pthread_mutex_t CURSOR_MUTEX;
+
+char CHAT[65536] = {'\0'};
+int CHAT_POINTER = 0;
+int CHAT_BUFFER_L = 150 * 16;
+
+char USERS[4096] = {'\0'};
+int USERS_POINTERS = 0;
+int USERS_POINTERS_L = 45 * 16;
+
+
+void GetMainScreen()
+{
+    char main_screen[4096];
+    FILE *fp;
+    char *file_name[32];
+    *file_name = "static/main_input.txt";
+    fp = fopen(*file_name, "r");
+    SetCursorPos(0, 0);
+    while (fgets(main_screen, 2812, fp) != NULL)
+        printf("%s", main_screen);
+    fclose(fp);
+    SetCursorPos(26, 29);
+}
+
+/*
+
+void PressEnter()
+{
+    // TODO
+}
+
+void Update()
+{
+    // TODO
+}
+
+void AnalizeChar()
+{
+    // TODO
+}
+
+void MoveCursorHorizontal()
+{
+    // TODO
+}
+
+void BackspaceHandler()
+{
+    // TODO
+}
+
+*/
+
+void MainHandler(char login[], char password[])
+{
+    int input_char;
+    int flag = 1;
+
+    int current_position = 0;
+    int last_position = 0;
+    GetMainScreen();
+    /*
+    while (flag)
+    {
+        input_char = getch();
+        switch (input_char)
+        {
+            // Enter
+            case 10:
+                {
+                    PressEnter();
+                    break;
+                }
+            // ESCAPE-SEQUENCE
+            case 27:
+                {
+                    input_char = getch();
+                    if (input_char == 91)
+                    {
+                        input_char = getch();
+                        switch (input_char)
+                        {
+                            case 65:
+                            {
+                                // Change current window
+                                break;
+                            }
+                            case 66:
+                            {
+                                // Change current login
+                                break;
+                            }
+                            case 67:
+                            {
+                                // Move right
+                                HorizontalCursorMove(1, left_shift, login_position, login_max_symbols_counter, &login_symbols_pointer);
+                                break;
+                            }
+                            case 68:
+                            {
+                                // Move right
+                                HorizontalCursorMove(-1, left_shift, login_position, login_max_symbols_counter, &login_symbols_pointer); 
+                                break;
+                            }
+                            default:
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        // Exit
+                        system("clear");
+                        printf("Exit\n");
+                        exit(0);
+                    }
+                    break;
+                }        
+            // Backspace
+            case 127: 
+            {
+                // Delete symbol
+               if (login_symbols_pointer > 0)
+                    BackspaceHandler(0, login, left_shift, login_position,
+                        &login_max_symbols_counter, &login_symbols_pointer, login_counter);
+                break;
+            }
+            default:
+            {
+                // Some input
+                if (login_symbols_pointer < 32)
+                {
+                    AnalizeInputChar(input_char, login, 0, &login_symbols_pointer, &login_max_symbols_counter, login_counter, left_shift, login_position);
+                }
+                break;
+            }
+        }
+        // Update screen
+    }
+    */
+}
 
 // BackspaceHandler(char input[], int left_shift, int shift_y, int* max_symbol_count, int* current_symbol, int symbols_counter[])
 // AnalizeInputChar(int code, char array[], int is_pass, int* current_symbol, int* max_symbol_count, int symbols_counter[])
 int main()
 {
     setlocale( LC_ALL, "");
-    AuthHandler();
 
+    char login[64] = {'\n'};
+    char password[64] = {'\n'};
 
-    // system("clear");
-
-    // char im[] = "абвгдаеёжзиклмнопрстуфхцшщъыьэюяАБВГД";
-    // for (int i = 0; im[i]; i++)
-    //     printf("%d", im[i]);
-    // printf("\n");
-
-    // char input[] = {'b', 208, 176, '\n', '\n', '\n', '\n', '\n'};
-    // int size[] = {1, 2, 0, 0, 0, 0, 0, 0};
-    // int current = 2;
-    // int max = 2;
-    // int left = 0;
-    // int y = 10;
-
-
-    // PrintNewSequence(left, y, current, max, input, size);
-    // printf("\n");
-
-    // printf("\n");
-    // for (int i = 0; input[i]; i++)
-    //     printf("input[%d] = %d\n", i, input[i]);
-    // printf("\n");
-    // for (int i = 0; size[i]; i++)
-    //     printf("size[%d] = %d\n", i, size[i]);
-    // printf("\n");
-
-    // int code = getch();
-    // AnalizeInputChar(code, input, 0, &current, &max, size, left, y);
-
-    // for (int i = 0; size[i]; i++)
-    //     printf("size[%d] = %d\n", i, size[i]);
-    // printf("\n");
-    // for (int i = 0; input[i]; i++)
-    //     printf("input[%d] = %d\n", i, input[i]);
-    // printf("\n");
+    AuthHandler(login, password);
+    system("clear");
+    MainHandler(login, password);
 }

@@ -42,8 +42,8 @@ int INPUT_SIZER_POINTER = 0;
 int INPUT_SIZER_LAST_SYMBOL_POINTER = 0;
 int ISRUN = 1;								// ISRUN
 
-char CURSOR_X = 0;
-char CURSOR_Y = 0;
+char CURSOR_X = 39;
+char CURSOR_Y = 28;
 
 char USER_LIST[4096][256];
 
@@ -83,6 +83,7 @@ void GetMainScreen()
     char main_screen[4096];
     FILE *fp;
     char *file_name[32];
+	system("clear");
     switch (SCREEN)
     {
         case BackgoundInput:
@@ -149,7 +150,7 @@ void PrintContentInput()
 
 void Update()
 {
-	got_msgfrom();
+	got_msgfrom();	
     GetMainScreen();
     PrintContentChat();
     PrintContentUsers();
@@ -163,7 +164,7 @@ void Update()
 void err(char *msg, const char *arg, bool critical) {
     if(msg == NULL || strlen(msg) == 0) {
         msg = strerror(errno);
-		if (!strcmp(msg, "Success")) {
+		if (!strcmp(msg, "Success") || !strcmp(msg, "Выполнено")) {
 			return;
 		}
     }
@@ -426,7 +427,7 @@ int copystr(char source[], char target[], int start, int count)
 	return 1;
 }
 
-int daemon_parser(char catched_commands[][255], char msg[])  		// парсер прилетающих с демона данных
+int daemon_parser(char catched_commands[][256], char msg[])  		// парсер прилетающих с демона данных
 {
 	char aux_arr[256] = {'\0'};
 	int counter = -1;
@@ -472,7 +473,8 @@ int daemon_parser(char catched_commands[][255], char msg[])  		// парсер �
 	{
 		if (strstr(catched_commands[i], "MSGFROM [") != NULL)
 		{
-			if (copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, 150))
+			int val = copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, 150);
+			if (val > 0)
 			{
 				MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
 				copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 150, 150);
@@ -502,17 +504,15 @@ int daemon_parser(char catched_commands[][255], char msg[])  		// парсер �
 						USER_LIST[k][j] = '\0';
 				dirty = 0;
 			}
-			
-			for (int a = 0; a < strlen(catched_commands[i]); a++)
-			{
-				
-				USER_LIST[i][a] = catched_commands[i][a];
-			}
+			copystr(catched_commands[i], USER_LIST[i], 0, 20);
 		}
 	}
 
-	Update();
-	START_NET = 1;
+	// if (MSG_LIST_POINTER > 2)
+	// {
+	// 	printf("%d\n", MSG_LIST_POINTER);
+	// 	exit(0);
+	// }
 	return comms_count;
 }
 
@@ -525,7 +525,10 @@ void auth(int sock_fd, char login[], char password[])			// авторизаци�
 		handle_LOGIN(sock_fd, login, password);
 		memset(result, 0, sizeof(result));
 		errwrap(recv(sock_fd, result, MAX_BUF_SIZE, 0));
-		printf(result);
+		sleep(1);
+
+		handle_USERS(SOCK_FD);
+		//printf(result);
 	}
 	else
 	{
@@ -631,24 +634,21 @@ void daemon_checker() 				// собсна демон
 
 void got_msgfrom()
 {
-	char recv_buf[MAX_BUF_SIZE] = {'\0'};				// принимаем сообщения
+    FDS[0].fd = SOCK_FD;
+	FDS[0].events = POLLIN;
 
-	int ret = poll( &FDS, 2, 1000 );
+	char recv_buf[MAX_BUF_SIZE] = {'\0'};				// принимаем сообщения
+	int ret = poll(&FDS, 2, 20);
 	if (ret == -1 || ret == 0)
 	{
 		//printf("empty poll");
 		return;
 	}
-
-	memset(recv_buf, "\0", sizeof(recv_buf));
-	errwrap(recv(SOCK_FD, recv_buf, 2048, 0));
-
-
-	char tmp_msg_array[4096][255];
-	int res3 = daemon_parser(tmp_msg_array, recv_buf);
+	memset(recv_buf, '\0', MAX_BUF_SIZE);
+	errwrap(recv(SOCK_FD, recv_buf, MAX_BUF_SIZE, 0));
+	char tmp_msg_array[4096][256];
+	daemon_parser(tmp_msg_array, recv_buf);
 }
-
-
 
 void kek()						// самая полезная функция эвер
 {

@@ -646,9 +646,18 @@ void MainHandler()
     int input_char;
     int flag = 1;
     Update();
+    sleep(1);
+    int counter = 0;
     while (flag)
     {
         input_char = getch();
+        if (counter == 50)
+        {
+            auth(SOCK_FD, LOGIN, PASSWORD);
+            sleep(1);
+            counter = 0;
+        }
+        counter++;
         switch (input_char)
         {
             // Enter
@@ -712,6 +721,7 @@ void MainHandler()
                 break;
             }
         }
+        
         Update();
     }
 }
@@ -753,15 +763,15 @@ int main()
     // pthread_mutex_destroy(&CURSOR_MUTEX);
     // pthread_mutex_destroy(&SOCKET_MUTEX);
 
-    char buffer[256]= {'\0'};
     SOCK_FD = sock_init();
     sleep(1);
     char login[] = "agaffosh";
     char password[] = "123";
+
+    strcpy(LOGIN, login);
+    strcpy(PASSWORD, password);
     auth(SOCK_FD, login, password);
 
-    FDS[0].fd = SOCK_FD;
-	FDS[0].events = POLLIN;
     MainHandler();
     close(SOCK_FD);
 

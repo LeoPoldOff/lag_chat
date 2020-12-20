@@ -29,6 +29,8 @@ enum MainBackground
 
 int START_NET = 0;
 
+struct pollfd FDS[2];
+
 int LOGIN[256] = {'\0'};
 int PASSWORD[256] = {'\0'};
 
@@ -47,9 +49,6 @@ char USER_LIST[4096][256];
 
 char MSG_LIST[4096][256];
 int MSG_LIST_POINTER = 0;
-
-pthread_mutex_t CURSOR_MUTEX;
-pthread_mutex_t SOCKET_MUTEX;
 
 char CHAT[65536] = {'\0'};
 int CHAT_POINTER = 0;
@@ -150,25 +149,21 @@ void PrintContentInput()
 
 void Update()
 {
-    pthread_mutex_lock(&CURSOR_MUTEX);
+	got_msgfrom();
     GetMainScreen();
     PrintContentChat();
     PrintContentUsers();
     PrintContentInput();
     SetCursorPos(CURSOR_X, CURSOR_Y);
-    pthread_mutex_unlock(&CURSOR_MUTEX);
 }
 
-
-
 // ====================================================
-
 
 //*******************SERVICE FUNCTIONS******************
 void err(char *msg, const char *arg, bool critical) {
     if(msg == NULL || strlen(msg) == 0) {
         msg = strerror(errno);
-		if (!strcmp(msg, "Выполнено")) {
+		if (!strcmp(msg, "Success")) {
 			return;
 		}
     }
@@ -185,16 +180,13 @@ void err(char *msg, const char *arg, bool critical) {
 // handy error checker
 int errwrap(int ret) {
 
-	pthread_mutex_lock(&SOCKET_MUTEX);
     if(ret == -1) {
 		// critical, show error and exit
         err(NULL, NULL, true);
-		pthread_mutex_unlock(&SOCKET_MUTEX);
         return -1;
     } else {
 		// show error and continue execution
         err(NULL, NULL, false);
-		pthread_mutex_unlock(&SOCKET_MUTEX);
         return ret;
     }
 }
@@ -533,7 +525,7 @@ void auth(int sock_fd, char login[], char password[])			// авторизаци�
 		handle_LOGIN(sock_fd, login, password);
 		memset(result, 0, sizeof(result));
 		errwrap(recv(sock_fd, result, MAX_BUF_SIZE, 0));
-		// printf(result);
+		printf(result);
 	}
 	else
 	{
@@ -542,7 +534,7 @@ void auth(int sock_fd, char login[], char password[])			// авторизаци�
 	}
 }
 
-void *daemon_checker(void * arg) 				// собсна демон
+void daemon_checker() 				// собсна демон
 {
 	SOCK_FD = sock_init();
 	sleep(1);
@@ -621,21 +613,42 @@ void *daemon_checker(void * arg) 				// собсна демон
 				users_timing_counter = users_timing_counter + 1;
 			}
 			
-			sleep(1);								// принимаем сообщения
+			// sleep(1);								// принимаем сообщения
 
-			memset(recv_buf, 0, sizeof(recv_buf));
-			errwrap(recv(SOCK_FD, recv_buf, 2048, 0));
+			// memset(recv_buf, 0, sizeof(recv_buf));
+			// errwrap(recv(SOCK_FD, recv_buf, 2048, 0));
 
 
-			char tmp_msg_array[4096][255];
-			int res3 = daemon_parser(tmp_msg_array, recv_buf);
-			sleep(1);
+			// char tmp_msg_array[4096][255];
+			// int res3 = daemon_parser(tmp_msg_array, recv_buf);
+			// sleep(1);
 		}
 
     }
 	//close(SOCK_FD);
     return NULL;
 }
+
+void got_msgfrom()
+{
+	char recv_buf[MAX_BUF_SIZE] = {'\0'};				// принимаем сообщения
+
+	int ret = poll( &FDS, 2, 1000 );
+	if (ret == -1 || ret == 0)
+	{
+		//printf("empty poll");
+		return;
+	}
+
+	memset(recv_buf, "\0", sizeof(recv_buf));
+	errwrap(recv(SOCK_FD, recv_buf, 2048, 0));
+
+
+	char tmp_msg_array[4096][255];
+	int res3 = daemon_parser(tmp_msg_array, recv_buf);
+}
+
+
 
 void kek()						// самая полезная функция эвер
 {
@@ -656,14 +669,14 @@ void update()									// заглушка (выпилить впоследств
 }
 */
 
-void daemon_loop()				// петля с потоком для демона
-{
-	pthread_t daemon_thread;
-	//printf("kek\n");
-    pthread_create(&daemon_thread, NULL, daemon_checker, NULL);
-	//printf("kek\n");
-    pthread_join(&daemon_thread, NULL);
-}
+// void daemon_loop()				// петля с потоком для демона
+// {
+// 	pthread_t daemon_thread;
+// 	//printf("kek\n");
+//     pthread_create(&daemon_thread, NULL, daemon_checker, NULL);
+// 	//printf("kek\n");
+//     pthread_join(&daemon_thread, NULL);
+// }
 
 
 // int main(int argc, char **argv) 
@@ -671,10 +684,16 @@ void daemon_loop()				// петля с потоком для демона
 // 	// main_loop();
 
 // 	//pthread_t 
-// 	daemon_loop();
+// 	//daemon_loop();
 // 	//daemon_checker();
 
-// 	kek();
+// 	//kek();
+// 	char recv_buf[MAX_BUF_SIZE] = {'\0'};
+// 	int sock_fd = sock_init();
+// 	sleep(1);
+// 	handle_LOGIN(sock_fd, "agaffosh", "123");
+// 	printf("%d\n", errwrap(recv(sock_fd, recv_buf, 2048, 0)));
+
 //     exit(0);
 
 // }

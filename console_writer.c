@@ -754,14 +754,21 @@ int main()
     // pthread_mutex_destroy(&SOCKET_MUTEX);
 
     char buffer[256]= {'\0'};
-    int sock_fd = sock_init();
+    SOCK_FD = sock_init();
     sleep(1);
     char login[] = "agaffosh";
     char password[] = "123";
-    auth(sock_fd, login, password);
-    send_buf(sock_fd, "SNDALL|msg=GOSHA VPERED!!!!");
-    sleep(1);
-    errwrap(recv(sock_fd, buffer, 256, 0));
-    copystr(buffer, MSG_LIST[0], 0, 150);
-    printf("%s\n", MSG_LIST[0]);
+    auth(SOCK_FD, login, password);
+
+    FDS[0].fd = SOCK_FD;
+	FDS[0].events = POLLIN;
+    MainHandler();
+    close(SOCK_FD);
+
+
+    // send_buf(sock_fd, "SNDALL|msg=GOSHA VPERED!!!!");
+    // sleep(1);
+    // errwrap(recv(sock_fd, buffer, 256, 0));
+    // copystr(buffer, MSG_LIST[0], 0, 150);
+    // printf("%s\n", MSG_LIST[0]);
 }

@@ -8,6 +8,40 @@
 #include <semaphore.h>
 #include "parser.c"
 
+void err1(char *msg, const char *arg, bool critical) {
+    if(msg == NULL || strlen(msg) == 0) {
+        msg = strerror(errno);
+        if (!strcmp(msg, "Выполнено")) {
+            return;
+        }
+    }
+    if (arg != NULL) {
+        fprintf(stderr, "%s, '%s'\n", msg, arg);
+    } else {
+        fprintf(stderr, "%s\n", msg);
+    }
+    if(critical) {
+        exit(-1);
+    }
+}
+
+// handy error checker
+int errwrap1(int ret) {
+    if(ret == -1) {
+        // critical, show error and exit
+        err1(NULL, NULL, true);
+        return -1;
+    } else {
+        // show error and continue execution
+        err1(NULL, NULL, false);
+        return ret;
+    }
+}
+
+int send_buf1(int sock_fd, char* buf) {
+    return errwrap1(send(sock_fd, buf, strlen(buf), 0));
+}
+
 
 
 int getche() 
@@ -42,11 +76,6 @@ void SetCursorPos(int XPos, int YPos)
     printf("\033[%d;%dH", YPos+1, XPos+1);
 }
 */
-void SetInputCursor()
-{
-    SetCursorPos(5, 25);
-    printf(">");
-}
 
 void GetAuthScreen()
 {
@@ -499,13 +528,9 @@ void AuthHandler(char log[], char pass[])
 
 int PressEnter(int sock_fd){
 	char args[50][100];
+    
 	int res = request_parser(INPUT, args);
-
-    system("clear");
-    printf("%d", res);
-    printf("\n");
-    exit(0);
-
+    
     pthread_mutex_lock(&CURSOR_MUTEX);
     CURSOR_X = SHIFT_X;
     for (int i = 0; i < 256; i++)
@@ -519,8 +544,7 @@ int PressEnter(int sock_fd){
 		return -1;
 	}
 	else if (res == 0 | res == 1){
-        exit(0);
-		extern sendbuf(sock_fd, INPUT);
+		send_buf1(sock_fd, INPUT);
 		memset(INPUT, '\0', 256);
         pthread_mutex_unlock(&CURSOR_MUTEX);
 		return 1;
@@ -660,7 +684,7 @@ void BackspaceAnalizer()
     pthread_mutex_unlock(&CURSOR_MUTEX);
 }
 
-void MainHandler(char login[], char password[])
+void MainHandler()
 {
     int input_char;
     int flag = 1;
@@ -745,28 +769,40 @@ int main()
     strcpy(INPUT, clean);
     
     pthread_mutex_init(&CURSOR_MUTEX, NULL);
+    pthread_mutex_init(&SOCKET_MUTEX, NULL);
 
     CURSOR_X = 39;
     CURSOR_Y = 28;
 
-    char login[64] = {'\n'};
-    char password[64] = {'\n'};
+    char login[] = "1";
+    char password[] = "1";
 
-    AuthHandler(login, password);
-    
-    SOCK_FD = sock_init();
-    auth(SOCK_FD, login, password);
-    
+    // AuthHandler(login, password);
+    strcpy(LOGIN, login);
+    strcpy(PASSWORD, password);
     daemon_loop();
+    printf("Waiting...");
+
     system("clear");
-    MainHandler(login, password);
-    system("clear");    
+    while (START_NET == 0)
+    {
+        printf(".");
+    }
+
+    system("clear");
+    MainHandler();
+    system("clear"); 
+
     pthread_mutex_destroy(&CURSOR_MUTEX);
+    pthread_mutex_destroy(&SOCKET_MUTEX);
     
-   
-//    char b[] = "SNDALL|msg=vaflya";
-//    char args[50][100];
-//    strcpy(INPUT, b);
-//    int i = request_parser(INPUT, args);
-//    printf("%d", i);
+
+    // char msg[] = "LOH, PIIIDOR";
+    // char msg1[] = "SOSAAAAAAAAT";
+    // char b[] = "SNDALL|msg=vaflya";
+    // strcpy(MSG_LIST[0], msg);
+    // strcpy(MSG_LIST[1], msg1);
+    // strcpy(MSG_LIST[2], b);
+    // strcpy(INPUT, msg);
+    // Update();    
 }

@@ -27,6 +27,11 @@ enum MainBackground
 	BackgroundUsers
 };
 
+int START_NET = 0;
+
+int LOGIN[256] = {'\0'};
+int PASSWORD[256] = {'\0'};
+
 int SCREEN = BackgoundInput;
 
 char INPUT[256] = {'\0'};
@@ -44,6 +49,7 @@ char MSG_LIST[4096][256];
 int MSG_LIST_POINTER = 0;
 
 pthread_mutex_t CURSOR_MUTEX;
+pthread_mutex_t SOCKET_MUTEX;
 
 char CHAT[65536] = {'\0'};
 int CHAT_POINTER = 0;
@@ -58,6 +64,13 @@ int SHIFT_Y = 28;
 // ====================================================
 // функция принимает массив с данными, количество элементов и координаты в терминале
 // пишет в столбик данные из массива начиная с указанных координат
+
+// функция для установки каретки на указанное место
+void SetCursorPos(int XPos, int YPos)
+{
+    printf("\033[%d;%dH", YPos+1, XPos+1);
+}
+
 void print_massive_in_x_y(char massive[][256], int num_of_pieces, int start_segment, int x, int y) {
 	for (int a = 0; a < num_of_pieces; a++){
 			SetCursorPos(x, y);
@@ -110,7 +123,10 @@ void CopyToBuffer(char source[], char target[], int start, int size)
 
 void PrintContentChat()
 {
-    print_massive_in_x_y(MSG_LIST, 16, MSG_LIST_POINTER, 39, 9);
+	int start = MSG_LIST_POINTER - 16;
+	if (start < 0)
+		start = 0;
+    print_massive_in_x_y(MSG_LIST, 16,  start, 39, 9);
 }
 
 int getPointer(int symbol_number)
@@ -123,7 +139,7 @@ int getPointer(int symbol_number)
 
 void PrintContentUsers()
 {
-    print_massive_in_x_y(USER_LIST, 16, 0, 133, 9);
+    print_massive_in_x_y(USER_LIST, 20, 0, 133, 9);
 }
 
 void PrintContentInput()
@@ -286,7 +302,10 @@ char *return_joke(int num){
 
 
 int send_buf(int sock_fd, char* buf) {
-	return errwrap(send(sock_fd, buf, strlen(buf), 0));
+	pthread_mutex_lock(&SOCKET_MUTEX);
+	int result = errwrap(send(sock_fd, buf, strlen(buf), 0));
+	pthread_mutex_unlock(&SOCKET_MUTEX);
+	return result;
 }
 
 int handle_ECHO(int sock_fd) {
@@ -495,34 +514,20 @@ int daemon_parser(char catched_commands[][255], char msg[])  		// парсер �
 		comms_count = comms_count + 1;
 	}
 
-	pthread_mutex_lock(&CURSOR_MUTEX);
-	for (int i = 0; i < 4096; i++)
-		for (int j = 0; j < 255; j++)
-		{
-			USER_LIST[i][j] = '\0';
-		}
-	pthread_mutex_unlock(&CURSOR_MUTEX);
+	
 
 	slot_counter = 0;
 	counter = 0;
+	
+	int dirty = 1;
 
-	pthread_mutex_lock(&CURSOR_MUTEX);
+	// pthread_mutex_lock(&CURSOR_MUTEX);
 	for (int i = 0; i < comms_count; i++)
 	{
 		if (strstr(catched_commands[i], "MSGFROM [") != NULL)
 		{
-			counter = -1;
-			for (int a = 0; a < strlen(catched_commands[i]); a++)
-			{
-				counter = counter + 1;
-				MSG_LIST[MSG_LIST_POINTER][counter] = catched_commands[i][a];
-			}
-			// printf("\n----\n");
-			// printf(MSG_LIST[MSG_LIST_POINTER]);
-			// printf("\n----\n");
-
+			strcpy(MSG_LIST[MSG_LIST_POINTER], catched_commands[i]);
 			MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
-
 		}
 		else if (strcmp(catched_commands[i], "+") == 0)
 		{
@@ -536,29 +541,28 @@ int daemon_parser(char catched_commands[][255], char msg[])  		// парсер �
 		}
 		else if (strstr(catched_commands[i], "Выполнено") != NULL)
 		{
-			system("clear");
-			printf("СIДОРЕНКО ДОЛБОЁБ\n");
-			exit(0);
+			continue;
 		}
 		else 
 		{
-			counter = -1;
-			//printf("\n-----\n");
-			//printf(catched_commands[i]);
-			//printf("\n-----\n");
+			if (dirty)
+			{
+				for (int k = 0; k < 4096; k++)
+					for (int j = 0; j < 255; j++)
+						USER_LIST[k][j] = '\0';
+				dirty = 0;
+			}
+			
 			for (int a = 0; a < strlen(catched_commands[i]); a++)
 			{
-				counter = counter + 1;
-				USER_LIST[i][counter] = catched_commands[i][a];
+				
+				USER_LIST[i][a] = catched_commands[i][a];
 			}
-			// printf("\n");
-			// printf(USER_LIST[i]);
-			// printf("\n");
 		}
 	}
-	pthread_mutex_unlock(&CURSOR_MUTEX);
+	// pthread_mutex_unlock(&CURSOR_MUTEX);
 	Update();
-
+	START_NET = 1;
 	return comms_count;
 }
 
@@ -582,10 +586,7 @@ void auth(int sock_fd, char login[], char password[])			// авторизаци�
 
 void *daemon_checker(void * arg) 				// собсна демон
 {
-	
-	// pthread_mutex_lock(&CURSOR_MUTEX);
-	// SOCK_FD = sock_init();	
-	// pthread_mutex_unlock(&CURSOR_MUTEX);					// наш сокет на приём данных (вырезать впоследствии)
+	SOCK_FD = sock_init();
 
 	char cur_users[MAX_BUF_SIZE];
 	char recv_buf[MAX_BUF_SIZE];
@@ -596,18 +597,11 @@ void *daemon_checker(void * arg) 				// собсна демон
 
     while(ISRUN)
     {
-		pthread_mutex_lock(&CURSOR_MUTEX);
-
-		//auth(SOCK_FD, "agaffosh", "123");		// авторизируемся (вырезать впоследствии)
-
-		pthread_mutex_unlock(&CURSOR_MUTEX);
+		auth(SOCK_FD, LOGIN, PASSWORD);
 		sleep(1);
-		pthread_mutex_lock(&CURSOR_MUTEX);
 
 		fds[0].fd = SOCK_FD;
 		fds[0].events = POLLIN;
-
-		pthread_mutex_unlock(&CURSOR_MUTEX);
 
 		//timeout = 3000;
 		int ret = poll( &fds, 2, 1000 );
@@ -621,16 +615,11 @@ void *daemon_checker(void * arg) 				// собсна демон
 		else if (ret == 0)
 		{
 			if (users_timing_counter == 0)
-			{											// пингуем список юзеров
-													
-				pthread_mutex_lock(&CURSOR_MUTEX);
-
+			{			
 				handle_USERS(SOCK_FD);
 	  			memset(cur_users, 0, sizeof(cur_users));
 	  			errwrap(recv(SOCK_FD, cur_users, MAX_BUF_SIZE, 0));
 				
-				pthread_mutex_unlock(&CURSOR_MUTEX);
-
 				char tmp_user_array[4096][255];
 				int res = daemon_parser(tmp_user_array, cur_users);
 				users_timing_counter = users_timing_counter + 1;

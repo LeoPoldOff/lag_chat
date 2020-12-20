@@ -27,7 +27,7 @@ enum MainBackground
 	BackgroundUsers
 };
 
-int START_NET = 0;
+int START_NET = 1;
 
 struct pollfd FDS[2];
 

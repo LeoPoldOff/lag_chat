@@ -407,9 +407,8 @@ void AuthHandler(char log[], char pass[])
                     }
                     else
                     {
-                        system("clear");
-                        printf("Exit\n");
-                        exit(0);
+                        flag = 0;
+                        START_NET = 0;
                     }
                     break;
                 }        
@@ -732,53 +731,34 @@ int main()
 {
     setlocale( LC_ALL, "");
 
-    char clean[256] = {'\0'};
-    strcpy(INPUT, clean);
-    
-    // pthread_mutex_init(&CURSOR_MUTEX, NULL);
-    // pthread_mutex_init(&SOCKET_MUTEX, NULL);
+    while (START_NET)
+    {
+        char clean[256] = {'\0'};
+        strcpy(INPUT, clean);
+        char login[256] = {'\0'};
+        char password[256] = {'\0'};
 
-    // CURSOR_X = 39;
-    // CURSOR_Y = 28;
+        AuthHandler(login, password);
+        if (START_NET == 0)
+        {
+            SetCursorPos(0, 0);
+            for (int i = 0; i < 4096 * 4; i++)
+                printf(" ");
+            SetCursorPos(0, 0);
+            exit(0);
+        }
+        strcpy(LOGIN, login);
+        strcpy(PASSWORD, password);
 
-    // char login[] = "agaffosh";
-    // char password[] = "123";
+        SOCK_FD = sock_init();
+        auth(SOCK_FD, login, password);
 
-    // // AuthHandler(login, password);
-    // strcpy(LOGIN, login);
-    // strcpy(PASSWORD, password);
-    // daemon_loop();
-    // printf("Waiting...");
+        MainHandler();
+        close(SOCK_FD);
 
-    // system("clear");
-    // while (START_NET == 0)
-    // {
-    //     printf(".");
-    // }
-
-    // system("clear");
-    // MainHandler();
-    // system("clear"); 
-
-    // pthread_mutex_destroy(&CURSOR_MUTEX);
-    // pthread_mutex_destroy(&SOCKET_MUTEX);
-
-    SOCK_FD = sock_init();
-    sleep(1);
-    char login[] = "agaffosh";
-    char password[] = "123";
-
-    strcpy(LOGIN, login);
-    strcpy(PASSWORD, password);
-    auth(SOCK_FD, login, password);
-
-    MainHandler();
-    close(SOCK_FD);
-
-
-    // send_buf(sock_fd, "SNDALL|msg=GOSHA VPERED!!!!");
-    // sleep(1);
-    // errwrap(recv(sock_fd, buffer, 256, 0));
-    // copystr(buffer, MSG_LIST[0], 0, 150);
-    // printf("%s\n", MSG_LIST[0]);
+        SetCursorPos(0, 0);
+        for (int i = 0; i < 4096 * 4; i++)
+            printf(" ");
+        SetCursorPos(0, 0);
+    }
 }

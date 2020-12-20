@@ -184,13 +184,17 @@ void err(char *msg, const char *arg, bool critical) {
 
 // handy error checker
 int errwrap(int ret) {
+
+	pthread_mutex_lock(&SOCKET_MUTEX);
     if(ret == -1) {
 		// critical, show error and exit
         err(NULL, NULL, true);
+		pthread_mutex_unlock(&SOCKET_MUTEX);
         return -1;
     } else {
 		// show error and continue execution
         err(NULL, NULL, false);
+		pthread_mutex_unlock(&SOCKET_MUTEX);
         return ret;
     }
 }
@@ -205,10 +209,9 @@ int sock_init() {
 	return sock_fd;
 }
 
-void Piza_tower(char* msg){
+void Piza_tower(char msg[]){
 	int ch = '|';
 	if (strchr(msg, ch) != NULL){
-		printf("\nВсе '|' заменены на '/'\n");
 		for (int i = 0; i < strlen(msg); i++) 
 			if (msg[i] == '|') 
 				msg[i] = '/';
@@ -226,7 +229,7 @@ int valid_login_password(char* msg){
 char *return_sticker(int num){
 	FILE *file;
 	file = fopen("static/stickers.txt", "r");
-	char *result = malloc(100);
+	char result[100] = {'\0'};
 	char arr[45];
 	int skip = 6;
 	skip = skip * num;
@@ -245,7 +248,7 @@ char *return_sticker(int num){
 char *return_titres(){
 	FILE *file;
 	file = fopen("static/titres.txt", "r");
-	char *result = malloc(3200);
+	char result[100] = {'\100'};
 	char arr[200];
 
 	for (int i = 0; i < 16; i++){
@@ -260,7 +263,7 @@ char *return_titres(){
 char *return_avatar(int num){
 	FILE *file;
 	file = fopen("static/avatars.txt", "r");
-	char *result = malloc(100);
+	char result = {'\0'};
 	char arr[45];
 	int skip = 5;
 	skip = skip * num;
@@ -301,10 +304,8 @@ char *return_joke(int num){
 //*******************COMMAND HANDLING******************
 
 
-int send_buf(int sock_fd, char* buf) {
-	pthread_mutex_lock(&SOCKET_MUTEX);
+int send_buf(int sock_fd, char buf[]) {
 	int result = errwrap(send(sock_fd, buf, strlen(buf), 0));
-	pthread_mutex_unlock(&SOCKET_MUTEX);
 	return result;
 }
 
@@ -322,7 +323,6 @@ int handle_ECHO(int sock_fd) {
 	int *p;
 	p = &msg;
 	Piza_tower(p);
-	printf(msg);
 	char* res = malloc(strlen(cmd) + strlen(msg) + 1);
 	strcpy(res, cmd);
 	strcat(res, msg);
@@ -336,25 +336,36 @@ int handle_ECHO(int sock_fd) {
 	return send_buf(sock_fd, res);
 }
 
-int handle_LOGIN(int sock_fd, char* login, char* password) {
-	char* cmd = "LOGIN|username=";
+int getLength(char arr[])
+{
+	for (int i = 0; i < 256; i++)
+	{
+		if (arr[i] == '\0')
+			return i;
+	}
+	system("clear");
+	printf("BIG LENGTH");
+	exit(-1);
+}
+
+int handle_LOGIN(int sock_fd, char login[], char password[]) {
+	char cmd[] = "LOGIN|username=";
 	char msg[36];
-	char* cmd1 = "|password=";
+	char cmd1[] = "|password=";
 	char msg1[36];
 	//scanf("%s", &msg);
-	int *p;
-	p = login;
-	Piza_tower(p);
+	Piza_tower(login);
 	//scanf("%s", &msg1);
 	int *p1;
-	p1 = password;
-	Piza_tower(p1);
-	char* res = malloc(strlen(cmd) + strlen(p) + strlen(cmd1) + strlen(p1) + 1);
+	Piza_tower(password);
+	char* res = malloc(strlen(cmd) + getLength(login) + strlen(cmd1) + getLength(password) + 1);
 	strcpy(res, cmd);
-	strcat(res, p);
+	strcat(res, login);
 	strcat(res, cmd1);
-	strcat(res, p1);
-	return send_buf(sock_fd, res);
+	strcat(res, password);
+	
+	int val =  send_buf(sock_fd, res);
+	return val;
 }
 
 int handle_PING(int sock_fd) {
@@ -408,81 +419,28 @@ int handle_SNDALL(int sock_fd) {
 	return send_buf(sock_fd, res);
 }
 
-void main_loop() {
-	int sock_fd = sock_init();
-	int user_input = 0;
-	char result[MAX_BUF_SIZE];
-	char* help = 
-		"Choose an option:\n\n"
-		"1. Echo <msg>\n"
-		"2. Ping\n"
-		"3. Show users\n"
-		"4. Show help\n"
-		"5. Exit\n"
-		"6. Login <login> <password>\n"
-		"7. Send <username> <msg>\n"
-		"8. Send All <msg>\n\n";
-
-	while(1) {
-		printf(help);
-		scanf("%d", &user_input);
-		switch(user_input) {
-			case 1: {
-				handle_ECHO(sock_fd);
-				break;
-			}
-			case 2: {
-				handle_PING(sock_fd);
-				break;
-			}
-			case 3: {
-				handle_USERS(sock_fd);
-				break;
-			}
-			case 4: {
-				handle_HELP(sock_fd);
-				break;
-			}
-			case 5: {
-				goto _exit;
-			}
-			case 6: {
-				handle_LOGIN(sock_fd, "agaffosh", "123");
-				break;
-			}
-			case 7: {
-				handle_SEND(sock_fd);
-				break;
-			}
-			case 8: {
-				handle_SNDALL(sock_fd);
-				break;
-			}
-			default: {
-				printf("Wrong option");
-				continue;
-			}
-		}
-		memset(result, 0, sizeof(result));
-		errwrap(recv(sock_fd, result, MAX_BUF_SIZE, 0));
-		printf("Response: \n%s\n", result);
-		sleep(1);
-	}
-_exit:
-    close(sock_fd);
-}
 //*******************COMMAND HANDLING*********************
 
 //************************DAEMON**************************
 
+int copystr(char source[], char target[], int start, int count)
+{
+	for (int i = start; i < start + count; i++)
+	{
+		target[i] = source[i];
+		if (source[i] == '\0')
+			return 0;
+	}
+	return 1;
+}
+
 int daemon_parser(char catched_commands[][255], char msg[])  		// парсер прилетающих с демона данных
 {
-	char* aux_arr = malloc(255);
+	char aux_arr[256] = {'\0'};
 	int counter = -1;
 	int slot_counter = 0;
 	int comms_count = 0;
-	char* zero_str = malloc(255);
-	memset(zero_str, ' ', 255);
+	char zero_str[256] = {'\0'};
 	for (int e = 0; e < strlen(msg); e++){
 		counter = counter + 1;
 		if (msg[e] != '\n'){
@@ -514,19 +472,19 @@ int daemon_parser(char catched_commands[][255], char msg[])  		// парсер �
 		comms_count = comms_count + 1;
 	}
 
-	
-
 	slot_counter = 0;
 	counter = 0;
-	
-	int dirty = 1;
 
-	// pthread_mutex_lock(&CURSOR_MUTEX);
+	int dirty = 1;
 	for (int i = 0; i < comms_count; i++)
 	{
 		if (strstr(catched_commands[i], "MSGFROM [") != NULL)
 		{
-			strcpy(MSG_LIST[MSG_LIST_POINTER], catched_commands[i]);
+			if (copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, 150))
+			{
+				MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
+				copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 150, 150);
+			}
 			MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
 		}
 		else if (strcmp(catched_commands[i], "+") == 0)
@@ -560,7 +518,7 @@ int daemon_parser(char catched_commands[][255], char msg[])  		// парсер �
 			}
 		}
 	}
-	// pthread_mutex_unlock(&CURSOR_MUTEX);
+
 	Update();
 	START_NET = 1;
 	return comms_count;
@@ -587,6 +545,7 @@ void auth(int sock_fd, char login[], char password[])			// авторизаци�
 void *daemon_checker(void * arg) 				// собсна демон
 {
 	SOCK_FD = sock_init();
+	sleep(1);
 
 	char cur_users[MAX_BUF_SIZE];
 	char recv_buf[MAX_BUF_SIZE];
@@ -641,13 +600,11 @@ void *daemon_checker(void * arg) 				// собсна демон
 			if (users_timing_counter == 0)
 			{											// пингуем список юзеров
 													
-				pthread_mutex_lock(&CURSOR_MUTEX);
 
 				handle_USERS(SOCK_FD);
 	  			memset(cur_users, 0, sizeof(cur_users));
 	  			errwrap(recv(SOCK_FD, cur_users, MAX_BUF_SIZE, 0));
 
-				pthread_mutex_unlock(&CURSOR_MUTEX);
 
 				char tmp_user_array[4096][255];
 				int res = daemon_parser(tmp_user_array, cur_users);
@@ -664,13 +621,11 @@ void *daemon_checker(void * arg) 				// собсна демон
 				users_timing_counter = users_timing_counter + 1;
 			}
 			
-			sleep(1);														
-			pthread_mutex_lock(&CURSOR_MUTEX);				// принимаем сообщения
+			sleep(1);								// принимаем сообщения
 
 			memset(recv_buf, 0, sizeof(recv_buf));
 			errwrap(recv(SOCK_FD, recv_buf, 2048, 0));
 
-			pthread_mutex_unlock(&CURSOR_MUTEX);
 
 			char tmp_msg_array[4096][255];
 			int res3 = daemon_parser(tmp_msg_array, recv_buf);
@@ -716,7 +671,6 @@ void daemon_loop()				// петля с потоком для демона
 // 	// main_loop();
 
 // 	//pthread_t 
-// 	pthread_mutex_init(&CURSOR_MUTEX, NULL);
 // 	daemon_loop();
 // 	//daemon_checker();
 

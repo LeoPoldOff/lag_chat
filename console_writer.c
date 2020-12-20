@@ -8,42 +8,6 @@
 #include <semaphore.h>
 #include "parser.c"
 
-void err1(char *msg, const char *arg, bool critical) {
-    if(msg == NULL || strlen(msg) == 0) {
-        msg = strerror(errno);
-        if (!strcmp(msg, "Выполнено")) {
-            return;
-        }
-    }
-    if (arg != NULL) {
-        fprintf(stderr, "%s, '%s'\n", msg, arg);
-    } else {
-        fprintf(stderr, "%s\n", msg);
-    }
-    if(critical) {
-        exit(-1);
-    }
-}
-
-// handy error checker
-int errwrap1(int ret) {
-    if(ret == -1) {
-        // critical, show error and exit
-        err1(NULL, NULL, true);
-        return -1;
-    } else {
-        // show error and continue execution
-        err1(NULL, NULL, false);
-        return ret;
-    }
-}
-
-int send_buf1(int sock_fd, char* buf) {
-    return errwrap1(send(sock_fd, buf, strlen(buf), 0));
-}
-
-
-
 int getche() 
 {
 	int ch;
@@ -531,7 +495,6 @@ int PressEnter(int sock_fd){
     
 	int res = request_parser(INPUT, args);
     
-    pthread_mutex_lock(&CURSOR_MUTEX);
     CURSOR_X = SHIFT_X;
     for (int i = 0; i < 256; i++)
         INPUT_SIZER[i] = 0;
@@ -540,13 +503,11 @@ int PressEnter(int sock_fd){
 
 	if (res == -1){
 		memset(INPUT, '\0', 256);
-        pthread_mutex_unlock(&CURSOR_MUTEX);
 		return -1;
 	}
 	else if (res == 0 | res == 1){
-		send_buf1(sock_fd, INPUT);
+		send_buf(sock_fd, INPUT);
 		memset(INPUT, '\0', 256);
-        pthread_mutex_unlock(&CURSOR_MUTEX);
 		return 1;
 	}
 
@@ -556,7 +517,6 @@ void AnalizeChar(int code)
 {
     if (INPUT_SIZER_LAST_SYMBOL_POINTER >= 256)
         return; 
-    pthread_mutex_lock(&CURSOR_MUTEX);
     int position = getPointer(INPUT_SIZER_POINTER);
     int insert = 0;
     int increment = 1;
@@ -619,7 +579,6 @@ void AnalizeChar(int code)
     }
 
     CURSOR_X = SHIFT_X + INPUT_SIZER_POINTER;
-    pthread_mutex_unlock(&CURSOR_MUTEX);
 }
 
 void MoveCursorHorizontal(int direction)
@@ -641,7 +600,6 @@ void BackspaceAnalizer()
 {
     if (INPUT_SIZER_POINTER == 0)
         return;
-    pthread_mutex_lock(&CURSOR_MUTEX);
     
     int pointer_position = INPUT_SIZER_POINTER - 1;
     int shift = INPUT_SIZER[pointer_position];
@@ -681,7 +639,6 @@ void BackspaceAnalizer()
     INPUT_SIZER_POINTER = INPUT_SIZER_POINTER - 1;
     
     CURSOR_X = SHIFT_X + INPUT_SIZER_POINTER;
-    pthread_mutex_unlock(&CURSOR_MUTEX);
 }
 
 void MainHandler()
@@ -768,41 +725,43 @@ int main()
     char clean[256] = {'\0'};
     strcpy(INPUT, clean);
     
-    pthread_mutex_init(&CURSOR_MUTEX, NULL);
-    pthread_mutex_init(&SOCKET_MUTEX, NULL);
+    // pthread_mutex_init(&CURSOR_MUTEX, NULL);
+    // pthread_mutex_init(&SOCKET_MUTEX, NULL);
 
-    CURSOR_X = 39;
-    CURSOR_Y = 28;
+    // CURSOR_X = 39;
+    // CURSOR_Y = 28;
 
-    char login[] = "1";
-    char password[] = "1";
+    // char login[] = "agaffosh";
+    // char password[] = "123";
 
-    // AuthHandler(login, password);
-    strcpy(LOGIN, login);
-    strcpy(PASSWORD, password);
-    daemon_loop();
-    printf("Waiting...");
+    // // AuthHandler(login, password);
+    // strcpy(LOGIN, login);
+    // strcpy(PASSWORD, password);
+    // daemon_loop();
+    // printf("Waiting...");
 
-    system("clear");
-    while (START_NET == 0)
-    {
-        printf(".");
-    }
+    // system("clear");
+    // while (START_NET == 0)
+    // {
+    //     printf(".");
+    // }
 
-    system("clear");
-    MainHandler();
-    system("clear"); 
+    // system("clear");
+    // MainHandler();
+    // system("clear"); 
 
-    pthread_mutex_destroy(&CURSOR_MUTEX);
-    pthread_mutex_destroy(&SOCKET_MUTEX);
-    
+    // pthread_mutex_destroy(&CURSOR_MUTEX);
+    // pthread_mutex_destroy(&SOCKET_MUTEX);
 
-    // char msg[] = "LOH, PIIIDOR";
-    // char msg1[] = "SOSAAAAAAAAT";
-    // char b[] = "SNDALL|msg=vaflya";
-    // strcpy(MSG_LIST[0], msg);
-    // strcpy(MSG_LIST[1], msg1);
-    // strcpy(MSG_LIST[2], b);
-    // strcpy(INPUT, msg);
-    // Update();    
+    char buffer[256]= {'\0'};
+    int sock_fd = sock_init();
+    sleep(1);
+    char login[] = "agaffosh";
+    char password[] = "123";
+    auth(sock_fd, login, password);
+    send_buf(sock_fd, "SNDALL|msg=GOSHA VPERED!!!!");
+    sleep(1);
+    errwrap(recv(sock_fd, buffer, 256, 0));
+    copystr(buffer, MSG_LIST[0], 0, 150);
+    printf("%s\n", MSG_LIST[0]);
 }

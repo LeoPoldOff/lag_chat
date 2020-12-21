@@ -487,7 +487,21 @@ void AuthHandler(char log[], char pass[])
 
 // ============================================================================================================================================================
 // ============================================================================================================================================================
+void ScrollUsers(int direction)
+{
+    if (direction > 0 && USER_LIST_POINTER > USER_POINTER)
+        USER_POINTER++;
+    if (direction < 0 && USER_POINTER > 0)
+        USER_POINTER--;
+}
 
+void ScrollChat(int direction)
+{
+    if (direction > 0 && MSG_LIST_POINTER > MSG_POINTER)
+        MSG_POINTER++;
+    if (direction < 0 && MSG_POINTER > 0)
+        MSG_POINTER--;
+}
 
 int PressEnter(int sock_fd){
 	char args[50][100];
@@ -647,10 +661,11 @@ void MainHandler()
     Update();
     sleep(1);
     int counter = 0;
+    Update();
     while (flag)
     {
         input_char = getch();
-        if (counter == 50)
+        if (counter == 25)
         {
             auth(SOCK_FD, LOGIN, PASSWORD);
             sleep(1);
@@ -677,23 +692,61 @@ void MainHandler()
                             case 65:
                             {
                                 // Change current window
+                                BACKGROUND_POINTER = (BACKGROUND_POINTER + 1) % 3;
                                 break;
                             }
                             case 66:
                             {
                                 // Change current window
+                                BACKGROUND_POINTER--;
+                                if (BACKGROUND_POINTER < 0)
+                                    BACKGROUND_POINTER = 2;
                                 break;
                             }
                             case 67:
                             {
                                 // Move right
-                                MoveCursorHorizontal(1);
+                                switch (BACKGROUND_POINTER)
+                                {
+                                    case 0:
+                                    {
+                                        MoveCursorHorizontal(1);
+                                        break;
+                                    }
+                                    case 1:
+                                    {
+                                        ScrollChat(1);
+                                        break;
+                                    }
+                                    default:
+                                    {
+                                        ScrollUsers(1);
+                                        break;
+                                    }
+                                }
                                 break;
                             }
                             case 68:
                             {
                                 // Move left
-                                MoveCursorHorizontal(-1); 
+                                switch (BACKGROUND_POINTER)
+                                {
+                                    case 0:
+                                    {
+                                        MoveCursorHorizontal(-1);
+                                        break;
+                                    }
+                                    case 1:
+                                    {
+                                        ScrollChat(-1);
+                                        break;
+                                    }
+                                    default:
+                                    {
+                                        ScrollUsers(-1);
+                                        break;
+                                    }
+                                }
                                 break;
                             }
                             default:
@@ -710,13 +763,15 @@ void MainHandler()
             // Backspace
             case 127: 
             {
-                BackspaceAnalizer();
+                if (BACKGROUND_POINTER == 0)
+                    BackspaceAnalizer();
                 break;
             }
             default:
             {
                 // Some input
-                AnalizeChar(input_char);
+                if (BACKGROUND_POINTER == 0)
+                    AnalizeChar(input_char);
                 break;
             }
         }
@@ -725,12 +780,48 @@ void MainHandler()
     }
 }
 
+
+void Greeting(int greeting)
+{
+    char auth_screen[4096] = {'\0'};
+    FILE *fp;
+    char *file_name[32];
+    switch (greeting)
+    {
+        case 0:
+        {
+            *file_name = "static/greeting.txt";
+            break;
+        }       
+        case 1:
+        {
+            *file_name = "static/relogin.txt";
+            break;
+        }
+        default:
+        {
+            *file_name = "static/exit.txt";
+            break;
+        }
+    }
+    fp = fopen(*file_name, "r");
+    SetCursorPos(0, 0);
+    while (fgets(auth_screen, 2812, fp) != NULL)
+        printf("%s", auth_screen);
+    fclose(fp);
+}
+
+
+
+
+
 // BackspaceHandler(char input[], int left_shift, int shift_y, int* max_symbol_count, int* current_symbol, int symbols_counter[])
 // AnalizeInputChar(int code, char array[], int is_pass, int* current_symbol, int* max_symbol_count, int symbols_counter[])
 int main()
 {
     setlocale( LC_ALL, "");
 
+    
     while (START_NET)
     {
         char clean[256] = {'\0'};
@@ -741,12 +832,16 @@ int main()
         AuthHandler(login, password);
         if (START_NET == 0)
         {
+            Greeting(2);
+            sleep(2);
             SetCursorPos(0, 0);
             for (int i = 0; i < 4096 * 4; i++)
                 printf(" ");
             SetCursorPos(0, 0);
             exit(0);
         }
+        Greeting(0);
+
         strcpy(LOGIN, login);
         strcpy(PASSWORD, password);
 
@@ -754,11 +849,14 @@ int main()
         auth(SOCK_FD, login, password);
 
         MainHandler();
+        Greeting(1);
         close(SOCK_FD);
-
+        
+        sleep(2);
         SetCursorPos(0, 0);
         for (int i = 0; i < 4096 * 4; i++)
             printf(" ");
         SetCursorPos(0, 0);
+        Zerolizer();
     }
 }

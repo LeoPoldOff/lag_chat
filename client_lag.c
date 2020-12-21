@@ -28,6 +28,7 @@ enum MainBackground
 };
 
 int START_NET = 1;
+int BACKGROUND_POINTER = 0;
 
 struct pollfd FDS[2];
 
@@ -46,9 +47,12 @@ char CURSOR_X = 39;
 char CURSOR_Y = 28;
 
 char USER_LIST[4096][256];
+int USER_LIST_POINTER = 0;
+int USER_POINTER = 0;
 
 char MSG_LIST[4096][256];
 int MSG_LIST_POINTER = 0;
+int MSG_POINTER = 0;
 
 char CHAT[65536] = {'\0'};
 int CHAT_POINTER = 0;
@@ -60,6 +64,34 @@ int SOCK_FD = 0;
 int SHIFT_X = 39;
 int SHIFT_Y = 28;
 
+void Zerolizer()
+{
+	int START_NET = 1;
+	int BACKGROUND_POINTER = BackgoundInput;
+
+	memset(LOGIN, '\0', 256);
+	memset(PASSWORD, '\0', 256);
+	memset(INPUT, '\0', 256);
+	memset(INPUT_SIZER, 0, 256);
+	
+	INPUT_SIZER_POINTER = 0;
+	INPUT_SIZER_LAST_SYMBOL_POINTER = 0;
+	ISRUN = 1;								// ISRUN
+
+	CURSOR_X = 39;
+	CURSOR_Y = 28;
+
+	USER_LIST[4096][256];
+	USER_LIST_POINTER = 0;
+
+	MSG_LIST[4096][256];
+	MSG_LIST_POINTER = 0;
+
+	SOCK_FD = 0;
+
+	SHIFT_X = 39;
+	SHIFT_Y = 28;
+}
 // ====================================================
 // функция принимает массив с данными, количество элементов и координаты в терминале
 // пишет в столбик данные из массива начиная с указанных координат
@@ -84,7 +116,7 @@ void GetMainScreen()
     FILE *fp;
     char *file_name[32];
 	system("clear");
-    switch (SCREEN)
+    switch (BACKGROUND_POINTER)
     {
         case BackgoundInput:
         {
@@ -123,10 +155,7 @@ void CopyToBuffer(char source[], char target[], int start, int size)
 
 void PrintContentChat()
 {
-	int start = MSG_LIST_POINTER - 16;
-	if (start < 0)
-		start = 0;
-    print_massive_in_x_y(MSG_LIST, 16,  start, 39, 9);
+    print_massive_in_x_y(MSG_LIST, 16,  MSG_POINTER, 39, 9);
 }
 
 int getPointer(int symbol_number)
@@ -139,7 +168,7 @@ int getPointer(int symbol_number)
 
 void PrintContentUsers()
 {
-    print_massive_in_x_y(USER_LIST, 20, 0, 133, 9);
+    print_massive_in_x_y(USER_LIST, 20, USER_POINTER, 133, 9);
 }
 
 void PrintContentInput()
@@ -480,6 +509,7 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 				copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 150, 150);
 			}
 			MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
+			MSG_POINTER = MSG_LIST_POINTER - 16;
 		}
 		else if (strcmp(catched_commands[i], "+") == 0)
 		{
@@ -503,6 +533,7 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 					for (int j = 0; j < 255; j++)
 						USER_LIST[k][j] = '\0';
 				dirty = 0;
+				USER_LIST_POINTER = comms_count;
 			}
 			copystr(catched_commands[i], USER_LIST[i], 0, 20);
 		}

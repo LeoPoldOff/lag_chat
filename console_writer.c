@@ -528,7 +528,7 @@ int PressEnter(int sock_fd){
 
 void AnalizeChar(int code)
 {
-    if (INPUT_SIZER_LAST_SYMBOL_POINTER >= 256)
+    if (INPUT_SIZER_LAST_SYMBOL_POINTER >= 86)
         return; 
     int position = getPointer(INPUT_SIZER_POINTER);
     int insert = 0;
@@ -780,7 +780,6 @@ void MainHandler()
     }
 }
 
-
 void Greeting(int greeting)
 {
     char auth_screen[4096] = {'\0'};
@@ -812,9 +811,6 @@ void Greeting(int greeting)
 }
 
 
-
-
-
 // BackspaceHandler(char input[], int left_shift, int shift_y, int* max_symbol_count, int* current_symbol, int symbols_counter[])
 // AnalizeInputChar(int code, char array[], int is_pass, int* current_symbol, int* max_symbol_count, int symbols_counter[])
 int main()
@@ -833,7 +829,7 @@ int main()
         if (START_NET == 0)
         {
             Greeting(2);
-            sleep(2);
+            getch();
             SetCursorPos(0, 0);
             for (int i = 0; i < 4096 * 4; i++)
                 printf(" ");

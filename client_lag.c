@@ -44,7 +44,7 @@ int INPUT_SIZER_LAST_SYMBOL_POINTER = 0;
 int ISRUN = 1;								// ISRUN
 
 char CURSOR_X = 39;
-char CURSOR_Y = 28;
+char CURSOR_Y = 37;
 
 char USER_LIST[4096][256];
 int USER_LIST_POINTER = 0;
@@ -62,7 +62,35 @@ char USERS[4096] = {'\0'};
 int SOCK_FD = 0;
 
 int SHIFT_X = 39;
-int SHIFT_Y = 28;
+int SHIFT_Y = 37;
+
+void reverse(char s[])
+ {
+     int i, j;
+     char c;
+ 
+     for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
+         c = s[i];
+         s[i] = s[j];
+         s[j] = c;
+     }
+ }
+
+ void itoa(int n, char s[])
+ {
+     int i, sign;
+ 
+     if ((sign = n) < 0)  /* записываем знак */
+         n = -n;          /* делаем n положительным числом */
+     i = 0;
+     do {       /* генерируем цифры в обратном порядке */
+         s[i++] = n % 10 + '0';   /* берем следующую цифру */
+     } while ((n /= 10) > 0);     /* удаляем */
+     if (sign < 0)
+         s[i++] = '-';
+     s[i] = '\0';
+     reverse(s);
+ }
 
 void Zerolizer()
 {
@@ -79,7 +107,10 @@ void Zerolizer()
 	ISRUN = 1;								// ISRUN
 
 	CURSOR_X = 39;
-	CURSOR_Y = 28;
+	CURSOR_Y = 41;
+
+	USER_POINTER = 0;
+	MSG_POINTER = 0;
 
 	USER_LIST[4096][256];
 	USER_LIST_POINTER = 0;
@@ -90,7 +121,7 @@ void Zerolizer()
 	SOCK_FD = 0;
 
 	SHIFT_X = 39;
-	SHIFT_Y = 28;
+	SHIFT_Y = 37;
 }
 // ====================================================
 // функция принимает массив с данными, количество элементов и координаты в терминале
@@ -155,7 +186,7 @@ void CopyToBuffer(char source[], char target[], int start, int size)
 
 void PrintContentChat()
 {
-    print_massive_in_x_y(MSG_LIST, 16,  MSG_POINTER, 39, 9);
+    print_massive_in_x_y(MSG_LIST, 16,  MSG_POINTER, 39, 18);
 }
 
 int getPointer(int symbol_number)
@@ -168,13 +199,24 @@ int getPointer(int symbol_number)
 
 void PrintContentUsers()
 {
-    print_massive_in_x_y(USER_LIST, 20, USER_POINTER, 133, 9);
+    print_massive_in_x_y(USER_LIST, 20, USER_POINTER, 133, 18);
 }
 
 void PrintContentInput()
 {
     SetCursorPos(SHIFT_X, SHIFT_Y);
     printf(INPUT);
+}
+
+void PrintLeftSymbols()
+{
+	char max_count[] = " / 85";
+	char current_count[10];
+    itoa(INPUT_SIZER_POINTER, current_count);
+    strcat(current_count, max_count);
+	char res[1][8];
+	copystr_0(current_count, res[0], 0, 8);
+	print_massive_in_x_y(res, 1, 0, SHIFT_X, SHIFT_Y + 1);
 }
 
 void Update()
@@ -184,6 +226,7 @@ void Update()
     PrintContentChat();
     PrintContentUsers();
     PrintContentInput();
+	PrintLeftSymbols();
     SetCursorPos(CURSOR_X, CURSOR_Y);
 }
 
@@ -458,6 +501,17 @@ int copystr(char source[], char target[], int start, int count)
 	return 1;
 }
 
+int copystr_0(char source[], char target[], int start, int count)
+{
+	for (int i = start; i < start + count; i++)
+	{
+		target[i - start] = source[i];
+		if (source[i] == '\0')
+			return 0;
+	}
+	return 1;
+}
+
 int daemon_parser(char catched_commands[][256], char msg[])  		// парсер прилетающих с демона данных
 {
 	char aux_arr[256] = {'\0'};
@@ -546,14 +600,18 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 		//=======================================================================
 			else
 			{
-				int val = copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, 150);
-				if (val > 0)
+				int val = copystr_0(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, 88);
+				int counter = 0;
+				while (val > 0)
 				{
 					MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
-					copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 150, 150);
+					counter++;
+					int position = counter * 88;
+					val = copystr_0(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], position, 88);
 				}
 				MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
 			}
+			MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
 			
 		}
 		else if (strcmp(catched_commands[i], "+") == 0)
@@ -578,6 +636,7 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 					for (int j = 0; j < 255; j++)
 						USER_LIST[k][j] = '\0';
 				dirty = 0;
+				USER_LIST_POINTER = comms_count;
 			}
 			copystr(catched_commands[i], USER_LIST[i], 0, 20);
 		}

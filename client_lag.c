@@ -471,7 +471,7 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 	int dirty = 1;
 	for (int i = 0; i < comms_count; i++)
 	{
-		if (strstr(catched_commands[i], "MSGFROM [") != NULL)
+		if (strstr(catched_commands[i], "MSGFROM [") != NULL || strstr(catched_commands[i], "v. 0.") != NULL || strstr(catched_commands[i], "Available commands") != NULL || strstr(catched_commands[i], "Response") != NULL)
 		{
 			int val = copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, 150);
 			if (val > 0)

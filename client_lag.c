@@ -248,23 +248,25 @@ int valid_login_password(char* msg){
 	return 1;
 }
 
-char *return_sticker(int num){
+int return_sticker(int num, char buf[][256]){
 	FILE *file;
 	file = fopen("static/stickers.txt", "r");
-	char result[100] = {'\0'};
+	// char result[100] = {'\0'};
 	char arr[45];
 	int skip = 6;
 	skip = skip * num;
 	for (int e = 0; e < skip; e++)
 		fgets(arr, 45, file);
 
-	for (int i = 0; i < 6; i++){
+	for (int i = 0; i < 5; i++){
 		fgets(arr, 45, file);
-		strcat(result, arr);
+		// strcat(result, arr);
+		// printf("%s\n", arr);
+		strcpy(buf[i], arr);
 	}
 
     fclose(file);
-    return result;
+    return 5;
 }
 
 char *return_titres(){
@@ -500,16 +502,59 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 	int dirty = 1;
 	for (int i = 0; i < comms_count; i++)
 	{
-		if (strstr(catched_commands[i], "MSGFROM [") != NULL || strstr(catched_commands[i], "v. 0.") != NULL || strstr(catched_commands[i], "Available commands") != NULL || strstr(catched_commands[i], "Response") != NULL)
+		if (strstr(catched_commands[i], "MSGFROM [") != NULL || strstr(catched_commands[i], "v. 0.") != NULL || strstr(catched_commands[i], "Available commands") != NULL)
 		{
-			int val = copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, 150);
-			if (val > 0)
+		//============================ STICKERS =================================
+
+			// if(strstr(catched_commands[i], "=)") != NULL)
+			if (catched_commands[i][strlen(catched_commands[i]) - 1] == ')' && catched_commands[i][strlen(catched_commands[i]) - 2] == '=' && catched_commands[i][strlen(catched_commands[i]) - 3] == ' ' && catched_commands[i][strlen(catched_commands[i]) - 4] == ':')
 			{
-				MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
-				copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 150, 150);
+				copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, strlen(catched_commands[i]) - 3);
+				MSG_LIST_POINTER ++;
+
+				parse_sticker_to_MSGLIST(0);
 			}
-			MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
-			MSG_POINTER = MSG_LIST_POINTER - 16;
+			else if (catched_commands[i][strlen(catched_commands[i]) - 1] == ')' && catched_commands[i][strlen(catched_commands[i]) - 2] == 'X' && catched_commands[i][strlen(catched_commands[i]) - 3] == ' ' && catched_commands[i][strlen(catched_commands[i]) - 4] == ':')
+			{
+				copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, strlen(catched_commands[i]) - 3);
+				MSG_LIST_POINTER ++;
+
+				parse_sticker_to_MSGLIST(1);
+			}
+			else if (catched_commands[i][strlen(catched_commands[i]) - 1] == ')' && catched_commands[i][strlen(catched_commands[i]) - 2] == '8' && catched_commands[i][strlen(catched_commands[i]) - 3] == ' ' && catched_commands[i][strlen(catched_commands[i]) - 4] == ':')
+			{
+				copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, strlen(catched_commands[i]) - 3);
+				MSG_LIST_POINTER ++;
+
+				parse_sticker_to_MSGLIST(2);
+			}
+			else if (catched_commands[i][strlen(catched_commands[i]) - 1] == '(' && catched_commands[i][strlen(catched_commands[i]) - 2] == '=' && catched_commands[i][strlen(catched_commands[i]) - 3] == ' ' && catched_commands[i][strlen(catched_commands[i]) - 4] == ':')
+			{
+				copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, strlen(catched_commands[i]) - 3);
+				MSG_LIST_POINTER ++;
+
+				parse_sticker_to_MSGLIST(3);
+			}
+			else if (catched_commands[i][strlen(catched_commands[i]) - 1] == '/' && catched_commands[i][strlen(catched_commands[i]) - 2] == '=' && catched_commands[i][strlen(catched_commands[i]) - 3] == ' ' && catched_commands[i][strlen(catched_commands[i]) - 4] == ':')
+			{
+				copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, strlen(catched_commands[i]) - 3);
+				MSG_LIST_POINTER ++;
+
+				parse_sticker_to_MSGLIST(4);
+			}
+
+		//=======================================================================
+			else
+			{
+				int val = copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, 150);
+				if (val > 0)
+				{
+					MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
+					copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 150, 150);
+				}
+				MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
+			}
+			
 		}
 		else if (strcmp(catched_commands[i], "+") == 0)
 		{
@@ -533,7 +578,6 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 					for (int j = 0; j < 255; j++)
 						USER_LIST[k][j] = '\0';
 				dirty = 0;
-				USER_LIST_POINTER = comms_count;
 			}
 			copystr(catched_commands[i], USER_LIST[i], 0, 20);
 		}
@@ -545,6 +589,19 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 	// 	exit(0);
 	// }
 	return comms_count;
+}
+
+void parse_sticker_to_MSGLIST(int sticker_number)
+{
+	char tmp_sticker_arr[5][256];
+	int a = return_sticker(sticker_number, tmp_sticker_arr);
+
+	//int sticker_arr_counter = 0;
+	for(int j = 0; j < 5; j++)
+	{
+		int val0 = copystr(tmp_sticker_arr[j], MSG_LIST[MSG_LIST_POINTER], 0, 150);
+		MSG_LIST_POINTER++;
+	}
 }
 
 void auth(int sock_fd, char login[], char password[])			// авторизация по логину и паролю

@@ -135,6 +135,7 @@ int request_parser(char* msg[], char args[][100]){
 			// printf("%s\n", "Вставай Саня, ты опять обосрался!");
 			return -1;
 		}
+		ECHO_SEND = 1;
 		return 0;
 	}
 

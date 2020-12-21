@@ -64,6 +64,8 @@ int SOCK_FD = 0;
 int SHIFT_X = 39;
 int SHIFT_Y = 37;
 
+int AVATAR_POINTER = 0;
+
 void reverse(char s[])
  {
      int i, j;
@@ -94,6 +96,15 @@ void reverse(char s[])
 
 void Zerolizer()
 {
+	srand(time(NULL));
+	int val = rand();
+    for (int i = 0; i < 5; i++)
+        val = rand()%5;
+	AVATAR_POINTER = val;
+
+
+
+
 	int START_NET = 1;
 	int BACKGROUND_POINTER = BackgoundInput;
 
@@ -107,7 +118,7 @@ void Zerolizer()
 	ISRUN = 1;								// ISRUN
 
 	CURSOR_X = 39;
-	CURSOR_Y = 41;
+	CURSOR_Y = 37;
 
 	USER_POINTER = 0;
 	MSG_POINTER = 0;
@@ -133,12 +144,83 @@ void SetCursorPos(int XPos, int YPos)
     printf("\033[%d;%dH", YPos+1, XPos+1);
 }
 
+void return_time(char res[]){
+	long int ttime;
+	ttime = time(NULL);
+	char msg[25];
+	strcpy(msg, ctime(&ttime));
+	// printf("%s\n", msg);
+	int counter = -1;
+	for (int e = 0; e < 25; e++){
+		if (e > 10 && e < 16){
+			counter = counter + 1;
+			res[counter] = msg[e];
+		}
+	}
+}
+
 void print_massive_in_x_y(char massive[][256], int num_of_pieces, int start_segment, int x, int y) {
 	for (int a = 0; a < num_of_pieces; a++){
 			SetCursorPos(x, y);
 			printf(massive[start_segment + a]);
 			y = y + 1;
 	}
+}
+
+int return_avatar(int num, char buf[][256])
+{
+	FILE *file;
+	file = fopen("static/avatars.txt", "r");
+	// char result = {'\0'};
+	char arr[45];
+	int skip = 5;
+	skip = skip * num;
+	for (int e = 0; e < skip; e++)
+		fgets(arr, 45, file);
+
+	for (int i = 0; i < 4; i++){
+		fgets(arr, 45, file);
+		// strcat(result, arr);
+		strcpy(buf[i], arr);
+	}
+
+    fclose(file);
+    return 4;
+}
+
+int return_joke(int num, char buf[][256]){
+	FILE *file;
+	file = fopen("static/jokes.txt", "r");
+	// char result[500] = {'\0'};
+	char arr[120];
+	int skip = 6;
+	int num_of_str = -1;
+	skip = skip * num;
+	for (int e = 0; e < skip; e++)
+		fgets(arr, 120, file);
+
+	for (int i = 0; i < 6; i++){
+		fgets(arr, 120, file);
+		if (strlen(arr) == 1)
+			continue;
+		// strcat(buf, arr);
+		num_of_str = num_of_str + 1;
+		strcpy(buf[num_of_str], arr);
+		// buf[i] = arr;
+		
+	}
+	num_of_str = num_of_str + 1;
+    fclose(file);
+    return num_of_str;
+}
+
+void PrintAvatar()
+{
+	char avatar[5][256];
+	int count_strings = return_avatar(AVATAR_POINTER, avatar);
+	SetCursorPos(144, 12);
+	printf("%s", LOGIN);
+	print_massive_in_x_y(avatar, count_strings, 0, 132, 10);
 }
 
 void GetMainScreen()
@@ -219,14 +301,31 @@ void PrintLeftSymbols()
 	print_massive_in_x_y(res, 1, 0, SHIFT_X, SHIFT_Y + 1);
 }
 
+void PrintTime()
+{
+	char time[1][5];
+	return_time(time[0]);
+	print_massive_in_x_y(time, 1, 0, 154, 8);
+}
+
+void PrintJoke()
+{
+	char joke[5][256];
+	int count = return_joke(AVATAR_POINTER, joke);
+	print_massive_in_x_y(joke, count, 0, 41, 10);
+}
+
 void Update()
 {
 	got_msgfrom();	
     GetMainScreen();
+	PrintAvatar();
     PrintContentChat();
     PrintContentUsers();
     PrintContentInput();
 	PrintLeftSymbols();
+	PrintTime();
+	PrintJoke();
     SetCursorPos(CURSOR_X, CURSOR_Y);
 }
 
@@ -327,45 +426,6 @@ char *return_titres(){
     return result;
 }
 
-char *return_avatar(int num){
-	FILE *file;
-	file = fopen("static/avatars.txt", "r");
-	char result = {'\0'};
-	char arr[45];
-	int skip = 5;
-	skip = skip * num;
-	for (int e = 0; e < skip; e++)
-		fgets(arr, 45, file);
-
-	for (int i = 0; i < 5; i++){
-		fgets(arr, 45, file);
-		strcat(result, arr);
-	}
-
-    fclose(file);
-    return result;
-}
-
-char *return_joke(int num){
-	FILE *file;
-	file = fopen("static/jokes.txt", "r");
-	char *result = malloc(500);
-	char arr[100];
-	int skip = 6;
-	skip = skip * num;
-	for (int e = 0; e < skip; e++)
-		fgets(arr, 100, file);
-
-	for (int i = 0; i < 6; i++){
-		fgets(arr, 100, file);
-		if (strlen(arr) == 1)
-			continue;
-		strcat(result, arr);
-	}
-
-    fclose(file);
-    return result;
-}
 //*******************SERVICE FUNCTIONS******************
 
 //*******************COMMAND HANDLING******************
@@ -554,6 +614,7 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 	counter = 0;
 
 	int dirty = 1;
+	int shift = 0;
 	for (int i = 0; i < comms_count; i++)
 	{
 		if (strstr(catched_commands[i], "MSGFROM [") != NULL || strstr(catched_commands[i], "v. 0.") != NULL || strstr(catched_commands[i], "Available commands") != NULL)
@@ -600,14 +661,14 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 		//=======================================================================
 			else
 			{
-				int val = copystr_0(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, 88);
+				int val = copystr_0(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, 100);
 				int counter = 0;
 				while (val > 0)
 				{
 					MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
 					counter++;
-					int position = counter * 88;
-					val = copystr_0(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], position, 88);
+					int position = counter * 100;
+					val = copystr_0(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], position, 100);
 				}
 				MSG_LIST_POINTER = MSG_LIST_POINTER + 1;
 			}
@@ -636,9 +697,15 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 					for (int j = 0; j < 255; j++)
 						USER_LIST[k][j] = '\0';
 				dirty = 0;
-				USER_LIST_POINTER = comms_count;
+				USER_LIST_POINTER = comms_count - 1;
 			}
-			copystr(catched_commands[i], USER_LIST[i], 0, 20);
+			if (strstr(catched_commands[i], LOGIN) != NULL)
+			{
+				shift++;
+				continue;
+			}
+				
+			copystr(catched_commands[i], USER_LIST[i - shift], 0, 20);
 		}
 	}
 

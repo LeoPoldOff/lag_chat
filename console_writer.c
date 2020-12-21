@@ -817,7 +817,7 @@ int main()
 {
     setlocale( LC_ALL, "");
 
-    
+    Zerolizer();
     while (START_NET)
     {
         char clean[256] = {'\0'};

@@ -66,6 +66,8 @@ int SHIFT_Y = 37;
 
 int AVATAR_POINTER = 0;
 
+int ECHO_SEND = 0;
+
 void reverse(char s[])
  {
      int i, j;
@@ -688,6 +690,16 @@ int daemon_parser(char catched_commands[][256], char msg[])  		// парсер �
 		else if (strstr(catched_commands[i], "Выполнено") != NULL)
 		{
 			continue;
+		}
+		else if (ECHO_SEND == 1)
+		{
+			for (int k = 1; k < strlen(catched_commands[i]); k ++)
+			{
+				MSG_LIST[MSG_LIST_POINTER][k-1] = catched_commands[i][k];
+			}
+			//copystr(catched_commands[i], MSG_LIST[MSG_LIST_POINTER], 0, strlen(catched_commands[i]));
+			MSG_LIST_POINTER ++;
+			ECHO_SEND = 0;
 		}
 		else 
 		{

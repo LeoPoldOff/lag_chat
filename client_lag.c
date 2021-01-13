@@ -771,7 +771,7 @@ void daemon_checker() 				// собсна демон
 	char cur_users[MAX_BUF_SIZE];
 	char recv_buf[MAX_BUF_SIZE];
 
-	struct pollfd fds[2];						// хероборина для обновления логина
+	struct pollfd fds[2];						// для обновления логина
 
 	int users_timing_counter = 0;
 
